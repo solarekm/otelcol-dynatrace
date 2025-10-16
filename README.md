@@ -13,14 +13,14 @@ Custom OpenTelemetry Collector distribution with integrated Dynatrace receiver f
 
 ### Using Binary
 ```bash
-./otelcol-dynatrace --config=collector-config.yaml
+./otelcol-dynatrace_dev-{hash}-{timestamp}_linux_amd64 --config=collector-config.yaml
 ```
 
 ### Using Docker
 ```bash
 docker run -d \
   -p 8888:8888 -p 13133:13133 -p 4317:4317 -p 4318:4318 \
-  your-registry/otelcol-dynatrace:latest
+  {ecr-registry}/otelcol-dynatrace_dev-{hash}-{timestamp}_linux_amd64
 ```
 
 ## Manual Workflow
@@ -28,9 +28,9 @@ docker run -d \
 Go to **Actions** → **Build and Deploy OpenTelemetry Collector** → **Run workflow**
 
 Available options:
-- **Build binary artifact** - Creates Linux AMD64 binary
-- **Deploy to JFrog Artifactory** - Uploads binary (requires JFrog secrets)
-- **Build Docker image to ECR** - Creates and pushes Docker image (requires AWS secrets)
+- **Build binary artifact** - Creates Linux AMD64 binary archive
+- **Deploy to JFrog Artifactory** - Uploads binary archive (requires JFrog secrets)
+- **Build Docker image to ECR** - Creates and pushes Docker image to AWS ECR (requires AWS secrets)
 
 ## GitHub Secrets
 
@@ -48,21 +48,16 @@ JFROG_REPOSITORY=your-repository
 ```
 AWS_ACCESS_KEY_ID=AKIAXXXXXXXXXXXXXXXX
 AWS_SECRET_ACCESS_KEY=your-secret-key
-AWS_DEFAULT_REGION=us-east-1
-AWS_ECR_REGISTRY=123456789012.dkr.ecr.us-east-1.amazonaws.com
+AWS_DEFAULT_REGION=eu-central-1
+AWS_ECR_REGISTRY=123456789012.dkr.ecr.eu-central-1.amazonaws.com
 ```
-
-## Monitoring
-
-- **Health**: http://localhost:13133/health
-- **Metrics**: http://localhost:8888/metrics
 
 ## Artifact Naming
 
 Follows OpenTelemetry naming convention:
-- **Binary**: `otelcol-dynatrace_{version}_{os}_{arch}.tar.gz`
-- **Docker**: `otelcol-dynatrace_{version}_{os}_{arch}:latest`
+- **Binary archive**: `otelcol-dynatrace_{version}_{os}_{arch}.tar.gz`
+- **Docker image**: `otelcol-dynatrace_{version}_{os}_{arch}`
 
 Examples:
-- `otelcol-dynatrace_1.0.0_linux_amd64.tar.gz`
-- `otelcol-dynatrace_dev-abc123-20251016152030_linux_amd64.tar.gz`
+- **Binary archive**: `otelcol-dynatrace_dev-e85090ec-20251016172801_linux_amd64`
+- **Docker image**: `otelcol-dynatrace_dev-e85090ec-20251016172801_linux_amd64.tar.gz`
