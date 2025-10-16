@@ -35,6 +35,7 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
       binary-filename: ${{ steps.filenames.outputs.binary-filename }}
+      binary-artifact-name: ${{ steps.filenames.outputs.binary-artifact-name }}
       docker-tag: ${{ steps.filenames.outputs.docker-tag }}
     steps:
       - name: Generate version
@@ -53,7 +54,8 @@ jobs:
           VERSION=${{ steps.version.outputs.version }}
           TIMESTAMP=$(date +'%y%m%d-%H%M')
           
-          echo "binary-filename=otelcol-dynatrace-${VERSION}-linux-amd64.tar.gz" >> $GITHUB_OUTPUT
+          echo "binary-filename=otelcol-dynatrace_${VERSION}_linux_amd64.tar.gz" >> $GITHUB_OUTPUT
+          echo "binary-artifact-name=otelcol-dynatrace_${VERSION}_linux_amd64" >> $GITHUB_OUTPUT
           echo "docker-tag=otelcol-dynatrace-${TIMESTAMP}" >> $GITHUB_OUTPUT
 
   build-binary:
@@ -96,7 +98,7 @@ jobs:
       - name: Upload binary artifact
         uses: actions/upload-artifact@v4
         with:
-          name: binary-artifact
+          name: ${{ needs.setup.outputs.binary-artifact-name }}
           path: dist/${{ needs.setup.outputs.binary-filename }}
           retention-days: 30
 
@@ -112,7 +114,7 @@ jobs:
       - name: Download binary artifact
         uses: actions/download-artifact@v4
         with:
-          name: binary-artifact
+          name: ${{ needs.setup.outputs.binary-artifact-name }}
 
       - name: Setup JFrog CLI
         uses: jfrog/setup-jfrog-cli@v4
