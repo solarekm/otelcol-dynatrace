@@ -1,42 +1,10 @@
-# OpenTelemetry Collector Configuration with Dynatrace Receiver
+# OpenTelemetry Collector Configuration
 # Environment variables required:
-# - DYNATRACE_API_ENDPOINT
-# - DYNATRACE_API_TOKEN
-# - DEPLOYMENT_ENVIRONMENT (optional, default: production)
+# - DEPLOYMENT_ENVIRONMENT
+# - CLUSTER_NAME
 
 receivers:
-  # 🎯 Dynatrace Receiver - main functionality
-  dynatrace:
-    API_ENDPOINT: ${env:DYNATRACE_API_ENDPOINT}
-    API_TOKEN: ${env:DYNATRACE_API_TOKEN}
-    metric_selectors:
-      # Container metrics
-      - builtin:containers.cpu.usageTime
-      - builtin:containers.memory.residentSetBytes
-      - builtin:containers.memory.usage
-      - builtin:containers.restartCount
-      
-      # Host metrics
-      - builtin:host.cpu.usage
-      - builtin:host.memory.usage
-      - builtin:host.disk.used
-      - builtin:host.disk.free
-      - builtin:host.network.bytes.transmitted
-      - builtin:host.network.bytes.received
-      
-      # Application metrics
-      - builtin:service.response.time
-      - builtin:service.throughput
-      - builtin:service.errorRate
-      
-    resolution: 1h
-    from: "now-1h"
-    to: "now"
-    poll_interval: 30s
-    max_retries: 3
-    http_timeout: 30s
-
-  # OTLP Receiver for additional data
+  # OTLP Receiver for data collection
   otlp:
     protocols:
       grpc:
@@ -44,18 +12,12 @@ receivers:
       http:
         endpoint: 0.0.0.0:4318
 
-  # Host metrics as additional source
+  # Host metrics receiver
   hostmetrics:
     collection_interval: 30s
     scrapers:
       cpu:
-        metrics:
-          system.cpu.utilization:
-            enabled: true
       memory:
-        metrics:
-          system.memory.utilization:
-            enabled: true
       disk:
       filesystem:
       network:
@@ -67,7 +29,7 @@ processors:
     send_batch_size: 1024
     send_batch_max_size: 2048
 
-  # Resource processor - dodawanie metadanych
+  # Resource processor - add metadata
   resource:
     attributes:
       - key: environment
@@ -76,44 +38,19 @@ processors:
       - key: collector.version
         value: "1.0.0"
         action: upsert
-      - key: data.source
-        value: "dynatrace"
-        action: upsert
       - key: cluster.name
         value: ${env:CLUSTER_NAME}
         action: upsert
 
-  # Resource detection - automatic environment detection
-  resourcedetection:
-    detectors: [env, system, docker, kubernetes]
-    timeout: 5s
-    override: false
-    attributes:
-      - key: host.name
-        action: keep
-      - key: k8s.pod.name
-        action: keep
-      - key: k8s.namespace.name
-        action: keep
-
-  # Transform processor - transformacje danych
+  # Transform processor - data transformations
   transform:
     metric_statements:
       - context: metric
         statements:
-          # Normalizacja nazw metryk
-          - set(name, "dynatrace." + name) where name != nil
-          # Dodawanie labeli
-          - set(attributes["source"], "dynatrace")
-
-  # Filter processor - filtrowanie niepotrzebnych metryk
-  filter:
-    metrics:
-      exclude:
-        match_type: regexp
-        metric_names:
-          - ".*debug.*"
-          - ".*test.*"
+          # Normalize metric names
+          - set(name, "otelcol." + name) where name != nil
+          # Add labels
+          - set(attributes["source"], "hostmetrics")
 
 exporters:
   # Logging exporter for debugging
@@ -122,38 +59,13 @@ exporters:
     sampling_initial: 5
     sampling_thereafter: 200
 
-  # Debug exporter for troubleshooting
-  debug:
-    verbosity: detailed
-    sampling_initial: 5
-    sampling_thereafter: 200
-
-  # OTLP exporter for data forwarding
-  otlp:
-    endpoint: ${env:OTLP_ENDPOINT}
-    tls:
-      insecure: ${env:OTLP_INSECURE}
-    headers:
-      authorization: "Bearer ${env:OTLP_TOKEN}"
-
   # Prometheus exporter
   prometheus:
     endpoint: "0.0.0.0:8888"
-    namespace: "dynatrace"
+    namespace: "otelcol"
     send_timestamps: true
     metric_expiration: 180m
     enable_open_metrics: true
-
-  # Kafka exporter (opcjonalny)
-  kafka:
-    brokers: [${env:KAFKA_BROKERS}]
-    topic: "otel-metrics"
-    protocol_version: "2.8.0"
-    auth:
-      sasl:
-        username: ${env:KAFKA_USERNAME}
-        password: ${env:KAFKA_PASSWORD}
-        mechanism: "PLAIN"
 
 extensions:
   # Health check extension
@@ -161,49 +73,20 @@ extensions:
     endpoint: 0.0.0.0:13133
     path: "/health"
 
-  # pprof extension for debugging
-  pprof:
-    endpoint: 0.0.0.0:1777
-
-  # zpages extension for diagnostics
-  zpages:
-    endpoint: 0.0.0.0:55679
-
-  # ballast extension for memory stability
-  ballast:
-    size_mib: 165
-
 service:
-  extensions: [health_check, pprof, zpages, ballast]
+  extensions: [health_check]
   
   pipelines:
-    # Main pipeline for Dynatrace metrics
-    metrics/dynatrace:
-      receivers: [dynatrace]
-      processors: [resourcedetection, resource, transform, batch]
-      exporters: [logging, prometheus, otlp]
-    
-    # Pipeline for host metrics
-    metrics/hostmetrics:
-      receivers: [hostmetrics]
-      processors: [resourcedetection, resource, filter, batch]
-      exporters: [prometheus, otlp]
-    
-    # Pipeline for OTLP
-    metrics/otlp:
-      receivers: [otlp]
-      processors: [resource, batch]
-      exporters: [prometheus, otlp]
+    # Main pipeline for metrics
+    metrics:
+      receivers: [otlp, hostmetrics]
+      processors: [resource, transform, batch]
+      exporters: [logging, prometheus]
 
   telemetry:
     logs:
       level: "info"
       development: false
-      sampling:
-        enabled: true
-        tick: 10s
-        initial: 5
-        thereafter: 200
     
     metrics:
       level: "detailed"
