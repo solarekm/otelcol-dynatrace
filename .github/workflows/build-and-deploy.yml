@@ -20,8 +20,8 @@ on:
         type: boolean
 
 env:
-  GOLANG_VERSION: '1.22'
-  COLLECTOR_BUILDER_VERSION: 'v0.129.0'
+  GOLANG_VERSION: '1.23'
+  COLLECTOR_BUILDER_VERSION: 'v0.137.0'
   REGISTRY: ${{ secrets.AWS_ECR_REGISTRY }}
   IMAGE_NAME: otelcol-dynatrace
 

@@ -3,21 +3,22 @@ dist:
   description: Custom OpenTelemetry Collector minimal
   output_path: ./dist
   version: ${VERSION}
+  otelcol_version: 0.137.0
 
 exporters:
-  - gomod: go.opentelemetry.io/collector/exporter/debugexporter v0.129.0
-  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/exporter/prometheusexporter v0.129.0
+  - gomod: go.opentelemetry.io/collector/exporter/debugexporter v0.137.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/exporter/prometheusexporter v0.137.0
 
 processors:
-  - gomod: go.opentelemetry.io/collector/processor/batchprocessor v0.129.0
+  - gomod: go.opentelemetry.io/collector/processor/batchprocessor v0.137.0
 
 receivers:
-  - gomod: go.opentelemetry.io/collector/receiver/otlpreceiver v0.129.0
+  - gomod: go.opentelemetry.io/collector/receiver/otlpreceiver v0.137.0
 
 extensions:
-  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.129.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.137.0
 
 providers:
-  - gomod: go.opentelemetry.io/collector/confmap/provider/envprovider v1.35.0
-  - gomod: go.opentelemetry.io/collector/confmap/provider/fileprovider v1.35.0
-  - gomod: go.opentelemetry.io/collector/confmap/provider/yamlprovider v1.35.0
+  - gomod: go.opentelemetry.io/collector/confmap/provider/envprovider v1.43.0
+  - gomod: go.opentelemetry.io/collector/confmap/provider/fileprovider v1.43.0
+  - gomod: go.opentelemetry.io/collector/confmap/provider/yamlprovider v1.43.0
