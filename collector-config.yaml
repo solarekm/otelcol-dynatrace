@@ -1,305 +1,54 @@
-# OpenTelemetry Collector Configuration# OpenTelemetry Collector Configuration with Dynatrace Integration# OpenTelemetry Collector Configuration
-
-# Environment variables required:
-
-# - DEPLOYMENT_ENVIRONMENT# Environment variables required:# Environment variables required:
-
-# - CLUSTER_NAME
-
-# - DEPLOYMENT_ENVIRONMENT# - DEPLOYMENT_ENVIRONMENT
+# OpenTelemetry Collector Configuration - Minimal Setup
 
 receivers:
-
-  # OTLP Receiver for data collection# - CLUSTER_NAME# - CLUSTER_NAME
-
+  # OTLP Receiver
   otlp:
-
     protocols:
-
       grpc:
-
-        endpoint: 0.0.0.0:4317receivers:receivers:
-
+        endpoint: 0.0.0.0:4317
       http:
+        endpoint: 0.0.0.0:4318
 
-        endpoint: 0.0.0.0:4318  # OTLP Receiver for data collection  # OTLP Receiver for data collection
-
-
-
-  # Host metrics receiver  otlp:  otlp:
-
-  hostmetrics:
-
-    collection_interval: 30s    protocols:    protocols:
-
-    scrapers:
-
-      cpu:      grpc:      grpc:
-
-      memory:
-
-      disk:        endpoint: 0.0.0.0:4317        endpoint: 0.0.0.0:4317
-
-      filesystem:
-
-      network:      http:      http:
-
-
-
-processors:        endpoint: 0.0.0.0:4318        endpoint: 0.0.0.0:4318
-
-  # Batch processor for optimization
-
-  batch:
-
-    timeout: 10s
-
-    send_batch_size: 1024  # Host metrics receiver  # Host metrics receiver
-
-    send_batch_max_size: 2048
-
-  hostmetrics:  hostmetrics:
-
-  # Resource processor - add metadata
-
-  resource:    collection_interval: 30s    collection_interval: 30s
-
-    attributes:
-
-      - key: environment    scrapers:    scrapers:
-
-        value: ${env:DEPLOYMENT_ENVIRONMENT}
-
-        action: upsert      cpu:      cpu:
-
-      - key: collector.version
-
-        value: "1.0.0"      memory:      memory:
-
-        action: upsert
-
-      - key: cluster.name      disk:      disk:
-
-        value: ${env:CLUSTER_NAME}
-
-        action: upsert      filesystem:      filesystem:
-
-
-
-exporters:      network:      network:
-
-  # Debug exporter for troubleshooting
-
-  debug:
-
-    verbosity: basic
-
-  # Dynatrace receiver (optional - requires DYNATRACE_* env vars)processors:
-
-  # Prometheus exporter
-
-  prometheus:  # Uncomment and configure when using Dynatrace integration  # Batch processor for optimization
-
-    endpoint: "0.0.0.0:8888"
-
-    namespace: "otelcol"  # dynatrace:  batch:
-
-    send_timestamps: true
-
-    metric_expiration: 180m  #   endpoint: ${env:DYNATRACE_API_ENDPOINT}    timeout: 10s
-
-
-
-extensions:  #   api_token: ${env:DYNATRACE_API_TOKEN}    send_batch_size: 1024
-
-  # Health check extension
-
-  health_check:  #   collection_interval: 60s    send_batch_max_size: 2048
-
-    endpoint: 0.0.0.0:13133
-
-    path: "/health"  #   metrics:
-
-
-
-service:  #     - builtin:host.cpu.usage  # Resource processor - add metadata
-
-  extensions: [health_check]
-
-    #     - builtin:host.mem.usage  resource:
-
-  pipelines:
-
-    # Main pipeline for metrics  #     - builtin:host.disk.usage    attributes:
-
+processors:
+  # Filter processor
+  filter:
     metrics:
+      include:
+        match_type: strict
+        metric_names: []
 
-      receivers: [otlp, hostmetrics]      - key: environment
-
-      processors: [resource, batch]
-
-      exporters: [debug, prometheus]processors:        value: ${env:DEPLOYMENT_ENVIRONMENT}
-
-
-
-  telemetry:  # Batch processor for optimization        action: upsert
-
-    logs:
-
-      level: "info"  batch:      - key: collector.version
-
-    
-
-    metrics:    timeout: 10s        value: "1.0.0"
-
-      level: "detailed"
-
-      address: "0.0.0.0:8888"    send_batch_size: 1024        action: upsert
-
-    send_batch_max_size: 2048      - key: cluster.name
-
-        value: ${env:CLUSTER_NAME}
-
-  # Resource processor - add metadata        action: upsert
-
-  resource:
-
-    attributes:  # Transform processor - data transformations
-
-      - key: environment  transform:
-
-        value: ${env:DEPLOYMENT_ENVIRONMENT}    metric_statements:
-
-        action: upsert      - context: metric
-
-      - key: collector.version        statements:
-
-        value: "1.0.0"          # Normalize metric names
-
-        action: upsert          - set(name, "otelcol." + name) where name != nil
-
-      - key: cluster.name          # Add labels
-
-        value: ${env:CLUSTER_NAME}          - set(attributes["source"], "hostmetrics")
-
-        action: upsert
-
-      - key: service.nameexporters:
-
-        value: "otelcol-dynatrace"  # Logging exporter for debugging
-
-        action: upsert  logging:
-
-    verbosity: detailed
-
-  # Transform processor - data transformations    sampling_initial: 5
-
-  transform:    sampling_thereafter: 200
-
+  # Transform processor
+  transform:
     metric_statements:
+      - context: metric
+        statements:
+          - set(name, "transformed." + name) where name != nil
 
-      - context: metric  # Prometheus exporter
-
-        statements:  prometheus:
-
-          # Normalize metric names    endpoint: "0.0.0.0:8888"
-
-          - set(name, "otelcol." + name) where name != nil    namespace: "otelcol"
-
-          # Add source label    send_timestamps: true
-
-          - set(attributes["source"], "hostmetrics") where instrumentation_scope.name == "otelcol/hostmetricsreceiver"    metric_expiration: 180m
-
-    enable_open_metrics: true
+connectors:
+  # Routing connector
+  routing:
+    default_pipelines: [metrics/default]
+    table:
+      - statement: route() where IsMatch(name, ".*")
+        pipelines: [metrics/default]
 
 exporters:
+  # Debug exporter
+  debug:
+    verbosity: basic
 
-  # Debug exporter for troubleshootingextensions:
-
-  debug:  # Health check extension
-
-    verbosity: basic  health_check:
-
-    sampling_initial: 5    endpoint: 0.0.0.0:13133
-
-    sampling_thereafter: 200    path: "/health"
-
-
-
-  # Prometheus exporterservice:
-
-  prometheus:  extensions: [health_check]
-
-    endpoint: "0.0.0.0:8888"  
-
-    namespace: "otelcol"  pipelines:
-
-    send_timestamps: true    # Main pipeline for metrics
-
-    metric_expiration: 180m    metrics:
-
-    enable_open_metrics: true      receivers: [otlp, hostmetrics]
-
-    resource_to_telemetry_conversion:      processors: [resource, transform, batch]
-
-      enabled: true      exporters: [logging, prometheus]
-
-
-
-  # Dynatrace exporter (optional - requires DYNATRACE_* env vars)  telemetry:
-
-  # Uncomment when using Dynatrace integration    logs:
-
-  # dynatrace:      level: "info"
-
-  #   endpoint: ${env:DYNATRACE_API_ENDPOINT}      development: false
-
-  #   api_token: ${env:DYNATRACE_API_TOKEN}    
-
-  #   prefix: "otelcol"    metrics:
-
-  #   tags:      level: "detailed"
-
-  #     - environment=${env:DEPLOYMENT_ENVIRONMENT}      address: "0.0.0.0:8888"
-
-  #     - cluster=${env:CLUSTER_NAME}    
-
-    resource:
-
-extensions:      service.name: "otelcol-dynatrace"
-
-  # Health check extension      service.version: "1.0.0"
-  health_check:
-    endpoint: 0.0.0.0:13133
-    path: "/health"
+  # OTLP HTTP exporter
+  otlphttp:
+    endpoint: http://localhost:4318
 
 service:
-  extensions: [health_check]
-  
   pipelines:
-    # Main pipeline for metrics
-    metrics:
-      receivers: [otlp, hostmetrics]
-      processors: [resource, transform, batch]
-      exporters: [debug, prometheus]
-      
-    # Dynatrace pipeline (optional)
-    # Uncomment when using Dynatrace integration
-    # metrics/dynatrace:
-    #   receivers: [dynatrace]
-    #   processors: [resource, batch]
-    #   exporters: [prometheus, dynatrace]
+    # Default metrics pipeline
+    metrics/default:
+      receivers: [otlp]
+      processors: [filter, transform]
+      exporters: [debug, otlphttp]
 
   telemetry:
     logs:
       level: "info"
-      development: false
-      encoding: "json"
-    
-    metrics:
-      level: "detailed"
-      address: "0.0.0.0:8888"
-    
-    resource:
-      service.name: "otelcol-dynatrace"
-      service.version: "1.0.0"
