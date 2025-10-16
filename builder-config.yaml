@@ -37,7 +37,6 @@ receivers:
   - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kubeletstatsreceiver v0.112.0
   
   # 🎯 DYNATRACE RECEIVER - main functionality
-  receivers:
   - gomod: github.com/macrimo/opentelemetry-collector-contrib/receiver/dynatracereceiver v0.0.0-20241203231524-42196ef91a0b
 
 extensions:

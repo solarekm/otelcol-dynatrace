@@ -10,13 +10,12 @@ This repository provides everything needed to build and deploy a custom OpenTele
 - **`collector-config.yaml`** - Ready-to-use collector configuration with Dynatrace receiver
 - **`Dockerfile`** - Multi-stage Docker image for containerized deployment
 - **`.github/workflows/build-and-deploy.yml`** - Complete CI/CD pipeline for building and distributing binaries
-- **`.env.example`** - Environment variables template
 
 ## � What You Get
 
 - **Dynatrace Receiver**: Native integration with Dynatrace Metrics API v2
-- **Multi-platform Binaries**: Automated builds for Linux, macOS, Windows (amd64, arm64)
-- **Docker Images**: Optimized container images pushed to AWS ECR
+- **Linux Binary**: Optimized build for Red Hat Linux VM deployment (AMD64)
+- **Docker Images**: Container images for AWS ECS deployment (opt-in to ECR)
 - **JFrog Distribution**: Binaries automatically uploaded to JFrog Artifactory
 - **Production Ready**: Health checks, monitoring, and observability built-in
 
@@ -34,7 +33,9 @@ JFROG_PASSWORD=your-jfrog-password
 JFROG_REPOSITORY=your-repository-name
 ```
 
-#### AWS ECR
+#### AWS ECR (Optional - for Docker deployment)
+**Note**: ECR deployment is disabled by default. Enable it manually via workflow_dispatch.
+
 ```
 AWS_ACCESS_KEY_ID=AKIAXXXXXXXXXXXXXXXX
 AWS_SECRET_ACCESS_KEY=your-secret-access-key
@@ -80,9 +81,10 @@ git push origin v1.0.0
 
 ### 4. Deploy and Run
 The pipeline will automatically:
-- Build multi-platform binaries
-- Create Docker images and push to ECR
-- Upload binaries to JFrog Artifactory
+- Build Linux AMD64 binary
+- Upload binary to JFrog Artifactory  
+- Create Docker image (if ECR deployment enabled)
+- Push image to ECR (if ECR deployment enabled)
 - Create GitHub release with artifacts
 
 ## 🏃 Quick Start
