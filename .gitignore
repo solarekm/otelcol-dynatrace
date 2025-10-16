@@ -1,0 +1,42 @@
+# Binaries
+dist/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Build artifacts
+*.tar.gz
+*.zip
+
+# Go
+*.mod
+*.sum
+vendor/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Environment files
+.env
+.env.local
+
+# Docker
+.dockerignore
+
+# Temporary files
+*.tmp
+*.temp
+
+# JFrog CLI
+.jfrog/

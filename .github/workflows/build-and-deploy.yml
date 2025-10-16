@@ -1,0 +1,273 @@
+name: Build and Deploy OpenTelemetry Collector with Dynatrace
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+    inputs:
+      deploy_to_jfrog:
+        description: 'Deploy binary to JFrog'
+        required: false
+        default: true
+        type: boolean
+      deploy_to_ecr:
+        description: 'Deploy Docker image to ECR'
+        required: false
+        default: true
+        type: boolean
+
+env:
+  GOLANG_VERSION: '1.21'
+  COLLECTOR_BUILDER_VERSION: 'v0.112.0'
+  REGISTRY: ${{ secrets.AWS_ECR_REGISTRY }}
+  IMAGE_NAME: otelcol-dynatrace
+
+jobs:
+  # Job 1: Build binary
+  build-binary:
+    name: Build OpenTelemetry Collector Binary
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - os: linux
+            arch: amd64
+            goos: linux
+            goarch: amd64
+          - os: linux
+            arch: arm64
+            goos: linux
+            goarch: arm64
+          - os: darwin
+            arch: amd64
+            goos: darwin
+            goarch: amd64
+          - os: darwin
+            arch: arm64
+            goos: darwin
+            goarch: arm64
+          - os: windows
+            arch: amd64
+            goos: windows
+            goarch: amd64
+    
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GOLANG_VERSION }}
+
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+
+    - name: Determine version
+      id: version
+      run: |
+        if [[ $GITHUB_REF == refs/tags/v* ]]; then
+          VERSION=${GITHUB_REF#refs/tags/v}
+        else
+          VERSION="dev-$(echo $GITHUB_SHA | cut -c1-8)"
+        fi
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+    - name: Install OpenTelemetry Collector Builder
+      run: |
+        go install go.opentelemetry.io/collector/cmd/builder@${{ env.COLLECTOR_BUILDER_VERSION }}
+
+    - name: Build collector
+      run: |
+        export VERSION=${{ steps.version.outputs.version }}
+        export GOOS=${{ matrix.goos }}
+        export GOARCH=${{ matrix.goarch }}
+        builder --config builder-config.yaml
+      
+    - name: Create binary archive
+      run: |
+        cd dist
+        if [ "${{ matrix.goos }}" = "windows" ]; then
+          mv otelcol-dynatrace otelcol-dynatrace.exe
+          zip -r otelcol-dynatrace-${{ steps.version.outputs.version }}-${{ matrix.os }}-${{ matrix.arch }}.zip otelcol-dynatrace.exe
+        else
+          tar -czf otelcol-dynatrace-${{ steps.version.outputs.version }}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz otelcol-dynatrace
+        fi
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: otelcol-dynatrace-${{ matrix.os }}-${{ matrix.arch }}
+        path: |
+          dist/otelcol-dynatrace-${{ steps.version.outputs.version }}-${{ matrix.os }}-${{ matrix.arch }}.*
+        retention-days: 30
+
+  # Job 2: Upload to JFrog Artifactory
+  upload-to-jfrog:
+    name: Upload Binary to JFrog Artifactory
+    runs-on: ubuntu-latest
+    needs: build-binary
+    if: |
+      (github.event_name == 'push' && contains(github.ref, 'refs/tags/')) || 
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_to_jfrog == 'true')
+    
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v3
+
+    - name: Setup JFrog CLI
+      uses: jfrog/setup-jfrog-cli@v3
+      env:
+        JF_URL: ${{ secrets.JFROG_URL }}
+        JF_USER: ${{ secrets.JFROG_USERNAME }}
+        JF_PASSWORD: ${{ secrets.JFROG_PASSWORD }}
+
+    - name: Upload binaries to JFrog
+      run: |
+        VERSION=${{ needs.build-binary.outputs.version }}
+        
+        # Upload each platform
+        for artifact in otelcol-dynatrace-*; do
+          echo "Uploading $artifact..."
+          cd "$artifact"
+          
+          for file in otelcol-dynatrace-*; do
+            # Extract platform from filename
+            PLATFORM=$(echo "$file" | sed "s/otelcol-dynatrace-$VERSION-//g" | sed 's/\.[^.]*$//')
+            
+            jf rt upload "$file" \
+              "${{ secrets.JFROG_REPOSITORY }}/otelcol-dynatrace/$VERSION/$PLATFORM/" \
+              --build-name="otelcol-dynatrace" \
+              --build-number="$VERSION" \
+              --module="otelcol-dynatrace-$PLATFORM"
+          done
+          
+          cd ..
+        done
+        
+        # Publish build info
+        jf rt build-publish "otelcol-dynatrace" "$VERSION"
+
+  # Job 3: Build and push Docker image
+  build-and-push-docker:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+    needs: build-binary
+    if: |
+      (github.event_name == 'push') || 
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_to_ecr == 'true')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.AWS_DEFAULT_REGION }}
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ steps.login-ecr.outputs.registry }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=semver,pattern={{major}}
+          type=raw,value=latest,enable={{is_default_branch}}
+          type=sha,prefix={{branch}}-
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        build-args: |
+          VERSION=${{ needs.build-binary.outputs.version }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Update ECS service (optional)
+      if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+      run: |
+        # Optional: Automatic ECS service update
+        if [ -n "${{ secrets.ECS_CLUSTER_NAME }}" ] && [ -n "${{ secrets.ECS_SERVICE_NAME }}" ]; then
+          aws ecs update-service \
+            --cluster ${{ secrets.ECS_CLUSTER_NAME }} \
+            --service ${{ secrets.ECS_SERVICE_NAME }} \
+            --force-new-deployment
+        fi
+
+  # Job 4: Create GitHub Release
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [build-binary, upload-to-jfrog, build-and-push-docker]
+    if: startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download all artifacts
+      uses: actions/download-artifact@v3
+
+    - name: Create release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          otelcol-dynatrace-*/*
+        body: |
+          ## OpenTelemetry Collector with Dynatrace v${{ needs.build-binary.outputs.version }}
+          
+          ### Features
+          - Custom Dynatrace receiver for metrics collection
+          - Multi-platform binary support
+          - Docker image available in ECR
+          - JFrog Artifactory distribution
+          
+          ### Supported Platforms
+          - Linux (amd64, arm64)
+          - macOS (amd64, arm64) 
+          - Windows (amd64)
+          
+          ### Docker Image
+          ```bash
+          docker pull ${{ secrets.AWS_ECR_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build-binary.outputs.version }}
+          ```
+          
+          ### Configuration
+          See `collector-config.yaml` for example configuration.
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
