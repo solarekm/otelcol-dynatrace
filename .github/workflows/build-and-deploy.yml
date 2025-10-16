@@ -26,33 +26,10 @@ env:
   IMAGE_NAME: otelcol-dynatrace
 
 jobs:
-  # Job 1: Build binary
+  # Job 1: Build binary for Linux AMD64 only
   build-binary:
     name: Build OpenTelemetry Collector Binary
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - os: linux
-            arch: amd64
-            goos: linux
-            goarch: amd64
-          - os: linux
-            arch: arm64
-            goos: linux
-            goarch: arm64
-          - os: darwin
-            arch: amd64
-            goos: darwin
-            goarch: amd64
-          - os: darwin
-            arch: arm64
-            goos: darwin
-            goarch: arm64
-          - os: windows
-            arch: amd64
-            goos: windows
-            goarch: amd64
     
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -91,29 +68,24 @@ jobs:
       run: |
         go install go.opentelemetry.io/collector/cmd/builder@${{ env.COLLECTOR_BUILDER_VERSION }}
 
-    - name: Build collector
+    - name: Build collector for Linux AMD64
       run: |
         export VERSION=${{ steps.version.outputs.version }}
-        export GOOS=${{ matrix.goos }}
-        export GOARCH=${{ matrix.goarch }}
+        export GOOS=linux
+        export GOARCH=amd64
         builder --config builder-config.yaml
       
     - name: Create binary archive
       run: |
         cd dist
-        if [ "${{ matrix.goos }}" = "windows" ]; then
-          mv otelcol-dynatrace otelcol-dynatrace.exe
-          zip -r otelcol-dynatrace-${{ steps.version.outputs.version }}-${{ matrix.os }}-${{ matrix.arch }}.zip otelcol-dynatrace.exe
-        else
-          tar -czf otelcol-dynatrace-${{ steps.version.outputs.version }}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz otelcol-dynatrace
-        fi
+        chmod +x otelcol-dynatrace
+        tar -czf otelcol-dynatrace-${{ steps.version.outputs.version }}-linux-amd64.tar.gz otelcol-dynatrace
 
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: otelcol-dynatrace-${{ matrix.os }}-${{ matrix.arch }}
-        path: |
-          dist/otelcol-dynatrace-${{ steps.version.outputs.version }}-${{ matrix.os }}-${{ matrix.arch }}.*
+        name: otelcol-dynatrace-linux-amd64
+        path: dist/otelcol-dynatrace-${{ steps.version.outputs.version }}-linux-amd64.tar.gz
         retention-days: 30
 
   # Job 2: Upload to JFrog Artifactory
@@ -126,8 +98,10 @@ jobs:
       (github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_to_jfrog == 'true')
     
     steps:
-    - name: Download all artifacts
+    - name: Download artifacts
       uses: actions/download-artifact@v4
+      with:
+        name: otelcol-dynatrace-linux-amd64
 
     - name: Setup JFrog CLI
       uses: jfrog/setup-jfrog-cli@v3
@@ -136,28 +110,16 @@ jobs:
         JF_USER: ${{ secrets.JFROG_USERNAME }}
         JF_PASSWORD: ${{ secrets.JFROG_PASSWORD }}
 
-    - name: Upload binaries to JFrog
+    - name: Upload binary to JFrog
       run: |
         VERSION=${{ needs.build-binary.outputs.version }}
+        FILE="otelcol-dynatrace-$VERSION-linux-amd64.tar.gz"
         
-        # Upload each platform
-        for artifact in otelcol-dynatrace-*; do
-          echo "Uploading $artifact..."
-          cd "$artifact"
-          
-          for file in otelcol-dynatrace-*; do
-            # Extract platform from filename
-            PLATFORM=$(echo "$file" | sed "s/otelcol-dynatrace-$VERSION-//g" | sed 's/\.[^.]*$//')
-            
-            jf rt upload "$file" \
-              "${{ secrets.JFROG_REPOSITORY }}/otelcol-dynatrace/$VERSION/$PLATFORM/" \
-              --build-name="otelcol-dynatrace" \
-              --build-number="$VERSION" \
-              --module="otelcol-dynatrace-$PLATFORM"
-          done
-          
-          cd ..
-        done
+        jf rt upload "$FILE" \
+          "${{ secrets.JFROG_REPOSITORY }}/otelcol-dynatrace/$VERSION/linux-amd64/" \
+          --build-name="otelcol-dynatrace" \
+          --build-number="$VERSION" \
+          --module="otelcol-dynatrace-linux-amd64"
         
         # Publish build info
         jf rt build-publish "otelcol-dynatrace" "$VERSION"
@@ -203,11 +165,11 @@ jobs:
           type=raw,value=latest,enable={{is_default_branch}}
           type=sha,prefix={{branch}}-
 
-    - name: Build and push Docker image
+    - name: Build and push Docker image for Linux AMD64
       uses: docker/build-push-action@v5
       with:
         context: .
-        platforms: linux/amd64,linux/arm64
+        platforms: linux/amd64
         push: true
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
@@ -238,27 +200,27 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Download all artifacts
+    - name: Download artifacts
       uses: actions/download-artifact@v4
+      with:
+        name: otelcol-dynatrace-linux-amd64
 
     - name: Create release
       uses: softprops/action-gh-release@v1
       with:
         files: |
-          otelcol-dynatrace-*/*
+          otelcol-dynatrace-*.tar.gz
         body: |
           ## OpenTelemetry Collector with Dynatrace v${{ needs.build-binary.outputs.version }}
           
           ### Features
           - Custom Dynatrace receiver for metrics collection
-          - Multi-platform binary support
+          - Optimized for Red Hat Linux VM and AWS ECS deployment
           - Docker image available in ECR
           - JFrog Artifactory distribution
           
-          ### Supported Platforms
-          - Linux (amd64, arm64)
-          - macOS (amd64, arm64) 
-          - Windows (amd64)
+          ### Supported Platform
+          - Linux AMD64 only
           
           ### Docker Image
           ```bash
