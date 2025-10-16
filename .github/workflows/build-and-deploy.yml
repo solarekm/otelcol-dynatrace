@@ -23,11 +23,14 @@ on:
         required: false
         default: false
         type: boolean
+      ecr_repository_name:
+        description: 'ECR repository name (leave empty to use default: otelcol-dynatrace)'
+        required: false
+        default: 'otelcol-dynatrace'
+        type: string
 
 env:
   GOLANG_VERSION: '1.24'
-  REGISTRY: ${{ secrets.AWS_ECR_REGISTRY }}
-  IMAGE_NAME: otelcol-dynatrace
 
 jobs:
   # Job 1: Build binary for Linux AMD64 only
@@ -167,7 +170,7 @@ jobs:
       id: meta
       uses: docker/metadata-action@v5
       with:
-        images: ${{ steps.login-ecr.outputs.registry }}/${{ env.IMAGE_NAME }}
+        images: ${{ secrets.AWS_ECR_REGISTRY }}
         tags: |
           type=ref,event=branch
           type=ref,event=pr
