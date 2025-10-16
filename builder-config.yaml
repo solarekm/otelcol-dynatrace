@@ -31,13 +31,13 @@ receivers:
   # Core receivers
   - gomod: go.opentelemetry.io/collector/receiver/otlpreceiver v0.112.0
   
-  # Contrib receivers
+  # Contrib receivers  
   - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.112.0
   - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver v0.112.0
   - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kubeletstatsreceiver v0.112.0
   
   # 🎯 DYNATRACE RECEIVER - main functionality
-  - gomod: github.com/MaCriMora/Dynatrace-opentelemetry-collector-contrib/receiver/dynatracereceiver@42196ef91a0b759530f94ba83881da7f978f73a9
+  - gomod: github.com/MaCriMora/Dynatrace-opentelemetry-collector-contrib/receiver/dynatracereceiver v0.0.0-20250409002842-42196ef91a0b
 
 extensions:
   # Core extensions
