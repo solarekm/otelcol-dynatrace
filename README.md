@@ -1,4 +1,4 @@
-# OpenTelemetry Collector with Dynatrace Receiver# OpenTelemetry Collector with Dynatrace Receiver# OpenTelemetry Collector with Dynatrace Receiver# OpenTelemetry Collector with Dynatrace Receiver
+# OpenTelemetry Collector with Dynatrace Receiver# OpenTelemetry Collector with Dynatrace Receiver# OpenTelemetry Collector with Dynatrace Receiver# OpenTelemetry Collector with Dynatrace Receiver# OpenTelemetry Collector with Dynatrace Receiver
 
 
 
@@ -6,7 +6,7 @@ Custom OpenTelemetry Collector distribution with integrated Dynatrace receiver.
 
 
 
-## Quick StartCustom OpenTelemetry Collector distribution with Dynatrace receiver integration.
+## Quick StartCustom OpenTelemetry Collector distribution with integrated Dynatrace receiver.
 
 
 
@@ -14,7 +14,7 @@ Custom OpenTelemetry Collector distribution with integrated Dynatrace receiver.
 
 ```bash
 
-export DEPLOYMENT_ENVIRONMENT="production"## FeaturesA custom OpenTelemetry Collector distribution with integrated Dynatrace receiver for seamless observability data collection and forwarding.This repository contains a custom OpenTelemetry Collector distribution with integrated Dynatrace receiver for seamless metrics collection and forwarding.
+export DEPLOYMENT_ENVIRONMENT="production"## Quick StartCustom OpenTelemetry Collector distribution with Dynatrace receiver integration.
 
 export CLUSTER_NAME="prod-cluster-01"
 
@@ -22,39 +22,39 @@ export CLUSTER_NAME="prod-cluster-01"
 
 ```
 
-- Dynatrace receiver for metrics collection
+### Using Binary
 
 ### Using Docker
 
-```bash- Manual workflow with independent build options  
+```bash```bash
 
 docker run -d \
 
-  -p 8888:8888 -p 13133:13133 -p 4317:4317 -p 4318:4318 \- Binary and Docker image builds## 🎯 Features## 📁 Repository Contents
+  -p 8888:8888 -p 13133:13133 -p 4317:4317 -p 4318:4318 \export DEPLOYMENT_ENVIRONMENT="production"## FeaturesA custom OpenTelemetry Collector distribution with integrated Dynatrace receiver for seamless observability data collection and forwarding.This repository contains a custom OpenTelemetry Collector distribution with integrated Dynatrace receiver for seamless metrics collection and forwarding.
 
   -e DEPLOYMENT_ENVIRONMENT="production" \
 
-  -e CLUSTER_NAME="prod-cluster-01" \- Health monitoring and Prometheus metrics
+  -e CLUSTER_NAME="prod-cluster-01" \export CLUSTER_NAME="prod-cluster-01"
 
   your-registry/otelcol-dynatrace:latest
 
-```
+```./otelcol-dynatrace --config=collector-config.yaml
 
 
 
-## Manual Workflow## Quick Start
+## Manual Workflow```
 
 
 
-Go to **Actions** → **Build and Deploy OpenTelemetry Collector** → **Run workflow**- **Dynatrace Integration**: Native Dynatrace receiver for metrics collectionThis repository provides everything needed to build and deploy a custom OpenTelemetry Collector with Dynatrace integration:
+Go to **Actions** → **Build and Deploy OpenTelemetry Collector** → **Run workflow**- Dynatrace receiver for metrics collection
 
 
 
-Options:### Docker
+Options:### Using Docker
 
 - Build binary artifact (creates Linux AMD64 binary)
 
-- Deploy to JFrog Artifactory (optional - requires secrets)```bash- **Manual Deployment Control**: Flexible workflow with independent build options
+- Deploy to JFrog Artifactory (optional - requires secrets)```bash- Manual workflow with independent build options  
 
 - Build Docker image to ECR (optional - requires secrets)
 
@@ -62,14 +62,85 @@ docker run -d \
 
 ## Required Environment Variables
 
-  --name otelcol-dynatrace \- **Multiple Distribution Formats**: Binary artifacts, Docker images, JFrog uploads- **`builder-config.yaml`** - OpenTelemetry Collector Builder configuration with all required components
+  -p 8888:8888 -p 13133:13133 -p 4317:4317 -p 4318:4318 \- Binary and Docker image builds## 🎯 Features## 📁 Repository Contents
 
 | Variable | Description | Example |
 
-|----------|-------------|---------|  -p 8888:8888 \
+|----------|-------------|---------|  -e DEPLOYMENT_ENVIRONMENT="production" \
 
 | `DEPLOYMENT_ENVIRONMENT` | Environment name | `production` |
 
+| `CLUSTER_NAME` | Cluster name | `prod-cluster-01` |  -e CLUSTER_NAME="prod-cluster-01" \- Health monitoring and Prometheus metrics
+
+
+
+## Optional Secrets (for workflow)  your-registry/otelcol-dynatrace:latest
+
+
+
+### JFrog (for binary upload)```
+
+- `JFROG_URL`
+
+- `JFROG_USERNAME` 
+
+- `JFROG_PASSWORD`
+
+- `JFROG_REPOSITORY`## Manual Workflow## Quick Start
+
+
+
+### AWS ECR (for Docker push)
+
+- `AWS_ACCESS_KEY_ID`
+
+- `AWS_SECRET_ACCESS_KEY`Go to **Actions** → **Build and Deploy OpenTelemetry Collector** → **Run workflow**- **Dynatrace Integration**: Native Dynatrace receiver for metrics collectionThis repository provides everything needed to build and deploy a custom OpenTelemetry Collector with Dynatrace integration:
+
+- `AWS_DEFAULT_REGION`
+
+- `AWS_ECR_REGISTRY`
+
+
+
+## MonitoringOptions:### Docker
+
+
+
+- Health: `http://localhost:13133/health`- Build binary artifact (creates Linux AMD64 binary)
+
+- Metrics: `http://localhost:8888/metrics`
+
+- Deploy to JFrog Artifactory (optional - requires secrets)```bash- **Manual Deployment Control**: Flexible workflow with independent build options
+
+## Building
+
+- Build Docker image to ECR (optional - requires secrets)
+
+```bash
+
+# Download OCBdocker run -d \
+
+curl -fL -o ocb https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/cmd%2Fbuilder%2Fv0.137.0/ocb_0.137.0_linux_amd64
+
+chmod +x ocb## Required Environment Variables
+
+
+
+# Build  --name otelcol-dynatrace \- **Multiple Distribution Formats**: Binary artifacts, Docker images, JFrog uploads- **`builder-config.yaml`** - OpenTelemetry Collector Builder configuration with all required components
+
+export VERSION=1.0.0
+
+./ocb --config builder-config.yaml| Variable | Description | Example |
+
+```
+
+|----------|-------------|---------|  -p 8888:8888 \
+
+## License
+
+| `DEPLOYMENT_ENVIRONMENT` | Environment name | `production` |
+
+MIT
 | `CLUSTER_NAME` | Cluster name | `prod-cluster-01` |  -p 13133:13133 \- **Production Ready**: Health checks, monitoring, and enterprise-grade configuration- **`collector-config.yaml`** - Ready-to-use collector configuration with Dynatrace receiver
 
 
