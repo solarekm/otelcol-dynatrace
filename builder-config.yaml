@@ -1,61 +1,29 @@
 dist:
   name: otelcol-dynatrace
-  description: Custom OpenTelemetry Collector with Dynatrace receiver
+  description: Custom OpenTelemetry Collector with minimal components
   output_path: ./dist
   version: ${VERSION}
-  go: go
+  otelcol_version: 0.112.0
 
 exporters:
-  # Core exporters
-  - gomod: go.opentelemetry.io/collector/exporter/debugexporter v0.112.0
-  - gomod: go.opentelemetry.io/collector/exporter/otlpexporter v0.112.0
+  # Core exporters only
   - gomod: go.opentelemetry.io/collector/exporter/loggingexporter v0.112.0
   
   # Contrib exporters
   - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/exporter/prometheusexporter v0.112.0
-  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter v0.112.0
-  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.112.0
 
 processors:
-  # Core processors
+  # Core processors only
   - gomod: go.opentelemetry.io/collector/processor/batchprocessor v0.112.0
   - gomod: go.opentelemetry.io/collector/processor/resourceprocessor v0.112.0
-  - gomod: go.opentelemetry.io/collector/processor/attributesprocessor v0.112.0
-  
-  # Contrib processors
-  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/transformprocessor v0.112.0
-  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/filterprocessor v0.112.0
-  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourcedetectionprocessor v0.112.0
 
 receivers:
-  # Core receivers
+  # Core receivers only
   - gomod: go.opentelemetry.io/collector/receiver/otlpreceiver v0.112.0
   
   # Contrib receivers  
-  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.112.0
   - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver v0.112.0
-  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kubeletstatsreceiver v0.112.0
-  
-  # 🎯 DYNATRACE RECEIVER - main functionality
-  # - gomod: github.com/macrimo/opentelemetry-collector-contrib/receiver/dynatracereceiver v0.0.0-20241203231524-42196ef91a0b
 
 extensions:
-  # Core extensions
-  - gomod: go.opentelemetry.io/collector/extension/ballastextension v0.112.0
-  - gomod: go.opentelemetry.io/collector/extension/zpagesextension v0.112.0
-  
   # Contrib extensions
   - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.112.0
-  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension v0.112.0
-
-connectors:
-  # Core connectors
-  - gomod: go.opentelemetry.io/collector/connector/forwardconnector v0.112.0
-
-providers:
-  # Configuration providers
-  - gomod: go.opentelemetry.io/collector/confmap/provider/envprovider v1.18.0
-  - gomod: go.opentelemetry.io/collector/confmap/provider/fileprovider v1.18.0
-  - gomod: go.opentelemetry.io/collector/confmap/provider/httpprovider v1.18.0
-  - gomod: go.opentelemetry.io/collector/confmap/provider/httpsprovider v1.18.0
-  - gomod: go.opentelemetry.io/collector/confmap/provider/yamlprovider v1.18.0

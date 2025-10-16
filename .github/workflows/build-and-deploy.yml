@@ -21,7 +21,7 @@ on:
 
 env:
   GOLANG_VERSION: '1.21'
-  COLLECTOR_BUILDER_VERSION: 'v0.112.0'
+  COLLECTOR_BUILDER_VERSION: 'v0.137.0'
   REGISTRY: ${{ secrets.AWS_ECR_REGISTRY }}
   IMAGE_NAME: otelcol-dynatrace
 
