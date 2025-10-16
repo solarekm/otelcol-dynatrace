@@ -71,14 +71,13 @@ jobs:
         curl --proto '=https' --tlsv1.2 -fL -o ocb \
         "https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/cmd%2Fbuilder%2F${{ env.COLLECTOR_BUILDER_VERSION }}/ocb_${VERSION_NO_V}_linux_amd64"
         chmod +x ocb
-        sudo mv ocb /usr/local/bin/builder
 
     - name: Build collector for Linux AMD64
       run: |
         export VERSION=${{ steps.version.outputs.version }}
         export GOOS=linux
         export GOARCH=amd64
-        builder --config builder-config.yaml
+        ./ocb --config builder-config.yaml
       
     - name: Create binary archive
       run: |
