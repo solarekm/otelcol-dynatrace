@@ -9,6 +9,17 @@ receivers:
       http:
         endpoint: 0.0.0.0:4318
 
+  # Dynatrace Receiver
+  dynatracereceiver:
+    endpoint: "https://your-dynatrace-tenant.live.dynatrace.com"
+    api_token: "your-api-token"
+    collect_interval: 60s
+    metrics:
+      - name: "host.cpu.usage"
+        dimensions: ["host.name"]
+      - name: "host.memory.usage"  
+        dimensions: ["host.name"]
+
 processors:
   # Filter processor
   filter:
@@ -45,7 +56,7 @@ service:
   pipelines:
     # Default metrics pipeline
     metrics/default:
-      receivers: [otlp]
+      receivers: [otlp, dynatracereceiver]
       processors: [filter, transform]
       exporters: [debug, otlphttp]
 

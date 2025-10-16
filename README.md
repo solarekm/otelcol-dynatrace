@@ -5,9 +5,20 @@ Custom OpenTelemetry Collector distribution with integrated Dynatrace receiver f
 ## Repository Contents
 
 - **`builder-config.yaml`** - OpenTelemetry Collector Builder configuration with Dynatrace receiver
-- **`collector-config.yaml`** - Runtime collector configuration  
+- **`collector-config.yaml`** - Runtime collector configuration with Dynatrace receiver setup
 - **`Dockerfile`** - Multi-stage Docker image for containerized deployment
 - **`.github/workflows/build-and-deploy.yml`** - Manual workflow for building and deploying
+
+## Configuration
+
+Before running the collector, update `collector-config.yaml` with your Dynatrace credentials:
+
+```yaml
+receivers:
+  dynatracereceiver:
+    endpoint: "https://your-dynatrace-tenant.live.dynatrace.com"
+    api_token: "your-api-token"
+```
 
 ## Quick Start
 
