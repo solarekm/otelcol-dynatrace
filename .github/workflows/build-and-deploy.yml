@@ -11,7 +11,7 @@ on:
       deploy_to_jfrog:
         description: 'Deploy binary to JFrog'
         required: false
-        default: true
+        default: false
         type: boolean
       deploy_to_ecr:
         description: 'Deploy Docker image to ECR'
@@ -173,17 +173,6 @@ jobs:
           VERSION=${{ needs.build-binary.outputs.version }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
-
-    - name: Update ECS service (optional)
-      if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-      run: |
-        # Optional: Automatic ECS service update
-        if [ -n "${{ secrets.ECS_CLUSTER_NAME }}" ] && [ -n "${{ secrets.ECS_SERVICE_NAME }}" ]; then
-          aws ecs update-service \
-            --cluster ${{ secrets.ECS_CLUSTER_NAME }} \
-            --service ${{ secrets.ECS_SERVICE_NAME }} \
-            --force-new-deployment
-        fi
 
   # Job 4: Create GitHub Release
   create-release:

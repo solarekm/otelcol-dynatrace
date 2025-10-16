@@ -5,10 +5,10 @@ FROM alpine:3.19 AS certs
 RUN apk --update add ca-certificates
 
 # Stage 2: Build OpenTelemetry Collector
-FROM golang:1.21-alpine AS build-stage
+FROM golang:1.23-alpine AS build-stage
 
 # Install build dependencies
-RUN apk add --no-cache git make
+RUN apk add --no-cache git make curl
 
 # Set working directory
 WORKDIR /build
@@ -20,15 +20,17 @@ COPY builder-config.yaml builder-config.yaml
 ARG VERSION=1.0.0
 ENV VERSION=${VERSION}
 
-# Install OpenTelemetry Collector Builder
-RUN --mount=type=cache,target=/root/.cache/go-build \
-    --mount=type=cache,target=/go/pkg/mod \
-    GO111MODULE=on go install go.opentelemetry.io/collector/cmd/builder@v0.112.0
+# Install OpenTelemetry Collector Builder (official approach)
+ARG COLLECTOR_BUILDER_VERSION=v0.137.0
+RUN VERSION_NO_V=$(echo ${COLLECTOR_BUILDER_VERSION} | sed 's/^v//') && \
+    curl --proto '=https' --tlsv1.2 -fL -o ocb \
+    "https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/cmd%2Fbuilder%2F${COLLECTOR_BUILDER_VERSION}/ocb_${VERSION_NO_V}_linux_amd64" && \
+    chmod +x ocb
 
 # Build the collector
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
-    builder --config builder-config.yaml
+    ./ocb --config builder-config.yaml
 
 # Stage 3: Final runtime image
 FROM gcr.io/distroless/base-debian12:latest
