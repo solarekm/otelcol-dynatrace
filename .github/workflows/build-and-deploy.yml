@@ -41,10 +41,11 @@ jobs:
       - name: Generate version
         id: version
         run: |
+          TIMESTAMP=$(date +'%Y%m%d%H%M%S')
           if [[ $GITHUB_REF == refs/tags/v* ]]; then
             VERSION=${GITHUB_REF#refs/tags/v}
           else
-            VERSION="dev-$(echo $GITHUB_SHA | cut -c1-8)"
+            VERSION="dev-$(echo $GITHUB_SHA | cut -c1-8)-${TIMESTAMP}"
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
@@ -52,11 +53,10 @@ jobs:
         id: filenames
         run: |
           VERSION=${{ steps.version.outputs.version }}
-          TIMESTAMP=$(date +'%y%m%d-%H%M')
           
           echo "binary-filename=otelcol-dynatrace_${VERSION}_linux_amd64.tar.gz" >> $GITHUB_OUTPUT
           echo "binary-artifact-name=otelcol-dynatrace_${VERSION}_linux_amd64" >> $GITHUB_OUTPUT
-          echo "docker-tag=otelcol-dynatrace-${TIMESTAMP}" >> $GITHUB_OUTPUT
+          echo "docker-tag=otelcol-dynatrace_${VERSION}_linux_amd64" >> $GITHUB_OUTPUT
 
   build-binary:
     name: Build Binary Artifact
