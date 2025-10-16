@@ -57,9 +57,8 @@ LABEL org.opencontainers.image.title="OpenTelemetry Collector with Dynatrace" \
 # Expose ports
 EXPOSE 4317 4318 8888 13133 1777 55679
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD ["/otelcol-dynatrace", "--config=/etc/otelcol/config.yaml", "--dry-run"]
+# Health check - distroless doesn't have curl/wget, so we'll let Docker/K8s handle external health checks
+# Users can add: curl -f http://localhost:13133/health in their deployment
 
 # Set entrypoint
 ENTRYPOINT ["/otelcol-dynatrace"]
