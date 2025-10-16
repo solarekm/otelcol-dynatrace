@@ -100,7 +100,7 @@ jobs:
         with:
           name: ${{ needs.setup.outputs.binary-artifact-name }}
           path: dist/${{ needs.setup.outputs.binary-filename }}
-          retention-days: 30
+          retention-days: 3
 
   deploy-to-jfrog:
     name: Deploy Binary to JFrog Artifactory
