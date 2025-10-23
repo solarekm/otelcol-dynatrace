@@ -81,5 +81,5 @@ Examples:
 The workflow is optimized to avoid duplicate OpenTelemetry builds:
 - Binary artifact is **always built** to ensure consistency
 - Docker build **reuses the binary artifact** when both options are selected
-- **Cleanup job** automatically removes artifacts after workflow completion
+- **Artifacts are automatically removed** after 1 day retention period
 - This reduces build time and ensures consistency between binary and Docker outputs

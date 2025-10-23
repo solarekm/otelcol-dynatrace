@@ -104,7 +104,7 @@ jobs:
         with:
           name: ${{ needs.setup.outputs.binary-artifact-name }}
           path: dist/${{ needs.setup.outputs.binary-filename }}
-          retention-days: 1  # Short retention as cleanup job will remove artifacts
+          retention-days: 1  # Artifacts automatically removed after 1 day
 
   # Deploy binary artifact to JFrog Artifactory - optional job
   deploy-to-jfrog:
@@ -186,16 +186,4 @@ jobs:
         run: |
           docker push ${{ env.REGISTRY }}:${{ needs.setup.outputs.docker-tag }}
 
-  # Cleanup artifacts after workflow completion to save storage
-  cleanup:
-    name: Cleanup Artifacts
-    runs-on: ubuntu-latest
-    needs: [setup, build-binary, deploy-to-jfrog, build-and-push-docker]
-    if: always()  # Run even if other jobs fail
-    
-    steps:
-      - name: Delete binary artifact
-        uses: geekyeggo/delete-artifact@v2
-        with:
-          name: ${{ needs.setup.outputs.binary-artifact-name }}
-          failOnError: false  # Don't fail workflow if artifact doesn't exist
+
