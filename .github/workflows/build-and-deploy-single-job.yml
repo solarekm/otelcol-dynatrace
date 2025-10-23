@@ -68,9 +68,9 @@ jobs:
           
           echo "version=$VERSION_FULL" >> $GITHUB_OUTPUT
           echo "environment=$ENV" >> $GITHUB_OUTPUT
-          echo "binary-filename=otelcol-dynatrace_${ENV}_${VERSION_CLEAN}_${OS}_${ARCH}.tar.gz" >> $GITHUB_OUTPUT
-          echo "binary-artifact-name=otelcol-dynatrace_${ENV}_${VERSION_CLEAN}_${OS}_${ARCH}" >> $GITHUB_OUTPUT
-          echo "docker-tag=otelcol-dynatrace_${ENV}_${VERSION_CLEAN}_${OS}_${ARCH}" >> $GITHUB_OUTPUT
+          echo "binary-filename=otelcol-dynatrace-${ENV}-${VERSION_CLEAN}-${OS}-${ARCH}.tar.gz" >> $GITHUB_OUTPUT
+          echo "binary-artifact-name=otelcol-dynatrace-${ENV}-${VERSION_CLEAN}-${OS}-${ARCH}" >> $GITHUB_OUTPUT
+          echo "docker-tag=otelcol-dynatrace-${ENV}-${VERSION_CLEAN}-${OS}-${ARCH}" >> $GITHUB_OUTPUT
 
       - name: Install OpenTelemetry Collector Builder
         run: |
