@@ -67,6 +67,7 @@ jobs:
 
       - name: Build OpenTelemetry Collector
         run: |
+          export VERSION="${{ steps.version.outputs.version }}"
           export GOOS=linux
           export GOARCH=amd64
           ./ocb --config builder-config.yaml
