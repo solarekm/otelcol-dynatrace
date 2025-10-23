@@ -36,7 +36,9 @@ docker run -d \
   {ecr-registry}:otelcol-dynatrace_{version}_linux_amd64
 ```
 
-## Manual Workflow
+## Manual Workflows
+
+### Multi-Job Workflow (Recommended)
 
 Go to **Actions** → **Build and Deploy OpenTelemetry Collector** → **Run workflow**
 
@@ -45,6 +47,20 @@ Go to **Actions** → **Build and Deploy OpenTelemetry Collector** → **Run wor
 Available options:
 - **Deploy to JFrog Artifactory** - Uploads binary archive (requires JFrog secrets)
 - **Build Docker image to ECR** - Creates and pushes Docker image to AWS ECR (requires AWS secrets)
+
+### Single Job Workflow (Alternative)
+
+Go to **Actions** → **Build and Deploy OT Collector - Single Job** → **Run workflow**
+
+**All operations in one job** for simplified execution and shared filesystem.
+
+Available options:
+- **Deploy to JFrog Artifactory** - Uploads binary archive (requires JFrog secrets)  
+- **Build Docker image to ECR** - Creates and pushes Docker image to AWS ECR (requires AWS secrets)
+
+**Differences:**
+- ✅ **Single Job**: Shared filesystem, no artifacts needed, simpler dependencies
+- ✅ **Multi Job**: Parallel execution, better error isolation, reusable artifacts
 
 ## GitHub Secrets
 

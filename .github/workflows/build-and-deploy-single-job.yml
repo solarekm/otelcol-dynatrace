@@ -1,0 +1,157 @@
+name: Build and Deploy OT Collector Contrib - Single Job
+
+# Manual workflow for building OpenTelemetry Collector with Dynatrace receiver
+# Single job approach - all operations in one job with shared filesystem
+on:
+  workflow_dispatch:
+    inputs:
+      deploy_to_jfrog:
+        description: 'Deploy binary to JFrog Artifactory'
+        required: false
+        default: false
+        type: boolean
+      build_and_push_docker:
+        description: 'Build and push Docker image to AWS ECR'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  GOLANG_VERSION: '1.24'
+  OCB_VERSION: '0.137.0'
+  REGISTRY: ${{ secrets.AWS_ECR_REGISTRY }}
+
+jobs:
+  # Single job combining setup, build, and deployment operations
+  build-and-deploy-all:
+    name: Build and Deploy Binary and Docker Image
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Go environment
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GOLANG_VERSION }}
+          cache: false
+
+      - name: Generate version and filenames
+        id: version
+        run: |
+          TIMESTAMP=$(date +'%Y%m%d%H%M%S')
+          if [[ $GITHUB_REF == refs/tags/v* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+          else
+            VERSION="dev-$(echo $GITHUB_SHA | cut -c1-8)-${TIMESTAMP}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "binary-filename=otelcol-dynatrace_${VERSION}_linux_amd64.tar.gz" >> $GITHUB_OUTPUT
+          echo "binary-artifact-name=otelcol-dynatrace_${VERSION}_linux_amd64" >> $GITHUB_OUTPUT
+          echo "docker-tag=otelcol-dynatrace_${VERSION}_linux_amd64" >> $GITHUB_OUTPUT
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "BINARY_FILENAME=otelcol-dynatrace_${VERSION}_linux_amd64.tar.gz" >> $GITHUB_ENV
+          echo "DOCKER_TAG=otelcol-dynatrace_${VERSION}_linux_amd64" >> $GITHUB_ENV
+
+      - name: Install OpenTelemetry Collector Builder
+        run: |
+          curl --proto '=https' --tlsv1.2 -fL -o ocb \
+            "https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/cmd%2Fbuilder%2Fv${{ env.OCB_VERSION }}/ocb_${{ env.OCB_VERSION }}_linux_amd64"
+          chmod +x ocb
+          ./ocb version
+
+      - name: Build OpenTelemetry Collector
+        run: |
+          export GOOS=linux
+          export GOARCH=amd64
+          ./ocb --config builder-config.yaml
+      
+      - name: Create binary archive
+        run: |
+          cd dist
+          chmod +x otelcol-dynatrace
+          tar -czf "$BINARY_FILENAME" otelcol-dynatrace
+          ls -la "$BINARY_FILENAME"
+
+      - name: Setup JFrog CLI
+        if: github.event.inputs.deploy_to_jfrog == 'true'
+        uses: jfrog/setup-jfrog-cli@v4
+        with:
+          version: 2.81.0
+        env:
+          JF_URL: ${{ secrets.JFROG_URL }}
+          JF_USER: ${{ secrets.JFROG_USERNAME }}
+          JF_PASSWORD: ${{ secrets.JFROG_PASSWORD }}
+
+      - name: Upload to JFrog Artifactory
+        if: github.event.inputs.deploy_to_jfrog == 'true'
+        run: |
+          cd dist
+          jf rt upload "$BINARY_FILENAME" \
+            "${{ secrets.JFROG_REPOSITORY }}/otelcol-dynatrace/$VERSION/linux-amd64/" \
+            --build-name="otelcol-dynatrace" \
+            --build-number="$VERSION" \
+            --module="otelcol-dynatrace-linux-amd64"
+          jf rt build-publish "otelcol-dynatrace" "$VERSION"
+
+      - name: Configure AWS credentials
+        if: github.event.inputs.build_and_push_docker == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_DEFAULT_REGION }}
+          mask-aws-account-id: false
+
+      - name: Login to Amazon ECR
+        if: github.event.inputs.build_and_push_docker == 'true'
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Prepare prebuilt binary for Docker build
+        if: github.event.inputs.build_and_push_docker == 'true'
+        run: |
+          mkdir -p ./prebuilt-binary
+          cp "dist/$BINARY_FILENAME" ./prebuilt-binary/
+          ls -la ./prebuilt-binary/
+
+      - name: Build and push Docker image
+        if: github.event.inputs.build_and_push_docker == 'true'
+        run: |
+          ./scripts/docker-build.sh \
+            "$VERSION" \
+            "v${{ env.OCB_VERSION }}" \
+            "${{ env.REGISTRY }}" \
+            "$DOCKER_TAG"
+
+      - name: Push Docker image to ECR
+        if: github.event.inputs.build_and_push_docker == 'true'
+        run: |
+          docker push "${{ env.REGISTRY }}:$DOCKER_TAG"
+
+      - name: Build summary
+        if: always()
+        run: |
+          echo "Version: $VERSION"
+          echo "Binary: $BINARY_FILENAME"
+          echo "Docker Tag: $DOCKER_TAG"
+          if [ -f "dist/$BINARY_FILENAME" ]; then
+            echo "Binary archive: dist/$BINARY_FILENAME ($(du -h "dist/$BINARY_FILENAME" | cut -f1))"
+          fi
+          if [ "${{ github.event.inputs.deploy_to_jfrog }}" == "true" ]; then
+            echo "JFrog deployment: requested"
+          fi
+          if [ "${{ github.event.inputs.build_and_push_docker }}" == "true" ]; then
+            echo "Docker build: requested"
+          fi
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.version.outputs.binary-artifact-name }}
+          path: dist/${{ steps.version.outputs.binary-filename }}
+          retention-days: 1

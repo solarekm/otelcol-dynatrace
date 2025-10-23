@@ -1,6 +1,6 @@
 name: Build and Deploy OT Collector Contrib
 
-# Manual workflow for building OpenTelemetry Collector with Dynatrace receiver
+# Manual workflow for building OpenTelemetry Collector Contrib with Dynatrace receiver
 # Always builds binary artifact, with optional deployments to JFrog and ECR
 on:
   workflow_dispatch:
@@ -83,7 +83,7 @@ jobs:
           # Verify OCB was downloaded successfully
           ./ocb version
 
-      - name: Build OpenTelemetry Collector
+      - name: Build OpenTelemetry Collector Contrib
         run: |
           # Set environment variables for OCB
           export VERSION=${{ needs.setup.outputs.version }}
