@@ -1,20 +1,42 @@
+# OpenTelemetry Collector Builder Configuration
+# Defines custom collector distribution with Dynatrace receiver integration
+
 dist:
   name: otelcol-dynatrace
   description: Custom OpenTelemetry Collector distribution
   output_path: ./dist
-  version: ${VERSION}
+  version: ${VERSION}  # Replaced at build time via environment variable
 
+# Export components - handle outgoing telemetry data
 exporters:
+  # Debug exporter for troubleshooting and development
   - gomod: go.opentelemetry.io/collector/exporter/debugexporter v0.137.0
+  # OTLP HTTP exporter for forwarding data to other collectors or backends
   - gomod: go.opentelemetry.io/collector/exporter/otlphttpexporter v0.137.0
 
+# Processing components - transform and filter telemetry data
 processors:
-  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/filterprocessor v0.137.0
-  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/transformprocessor v0.137.0
+  # Filter processor to include/exclude specific metrics
+  - gomod: >-
+      github.com/open-telemetry/opentelemetry-collector-contrib/processor/filterprocessor
+      v0.137.0
+  # Transform processor to modify metric names, labels, and values
+  - gomod: >-
+      github.com/open-telemetry/opentelemetry-collector-contrib/processor/transformprocessor
+      v0.137.0
 
+# Receive components - ingest telemetry data from various sources
 receivers:
+  # Standard OTLP receiver for receiving data from other collectors/exporters
   - gomod: go.opentelemetry.io/collector/receiver/otlpreceiver v0.137.0
-#  - gomod: github.com/solarekm/observability/Dynatrace-opentelemetry-collector-contrib/receiver/dynatracereceiver v0.0.0-20251016151306-e17d12273c2d
+  # Custom Dynatrace receiver for collecting metrics from Dynatrace API
+  - gomod: >-
+      github.com/solarekm/observability/Dynatrace-opentelemetry-collector-contrib/receiver/dynatracereceiver
+      v0.0.0-20251016151306-e17d12273c2d
 
+# Connector components - route data between pipelines
 connectors:
-  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector v0.137.0
+  # Routing connector for conditional data forwarding based on rules
+  - gomod: >-
+      github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector
+      v0.137.0

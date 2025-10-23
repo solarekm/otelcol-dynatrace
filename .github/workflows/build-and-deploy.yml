@@ -1,13 +1,10 @@
-name: Build and Deploy OpenTelemetry Collector
+name: Build and Deploy OT Collector Contrib
 
+# Manual workflow for building OpenTelemetry Collector with Dynatrace receiver
+# Always builds binary artifact, with optional deployments to JFrog and ECR
 on:
   workflow_dispatch:
     inputs:
-      build_binary:
-        description: 'Build binary artifact'
-        required: false
-        default: false
-        type: boolean
       deploy_to_jfrog:
         description: 'Deploy binary to JFrog Artifactory'
         required: false
@@ -29,6 +26,7 @@ env:
   REGISTRY: ${{ secrets.AWS_ECR_REGISTRY }}
 
 jobs:
+  # Generate version string and artifact names used across all jobs
   setup:
     name: Setup Build Variables
     runs-on: ubuntu-latest
@@ -42,6 +40,7 @@ jobs:
         id: version
         run: |
           TIMESTAMP=$(date +'%Y%m%d%H%M%S')
+          # Use tag version if building from tag, otherwise use dev version with commit hash
           if [[ $GITHUB_REF == refs/tags/v* ]]; then
             VERSION=${GITHUB_REF#refs/tags/v}
           else
@@ -54,15 +53,16 @@ jobs:
         run: |
           VERSION=${{ steps.version.outputs.version }}
           
+          # Generate consistent naming following OpenTelemetry conventions
           echo "binary-filename=otelcol-dynatrace_${VERSION}_linux_amd64.tar.gz" >> $GITHUB_OUTPUT
           echo "binary-artifact-name=otelcol-dynatrace_${VERSION}_linux_amd64" >> $GITHUB_OUTPUT
           echo "docker-tag=otelcol-dynatrace_${VERSION}_linux_amd64" >> $GITHUB_OUTPUT
 
+  # Build OpenTelemetry Collector binary - always runs to ensure artifact availability
   build-binary:
     name: Build Binary Artifact
     runs-on: ubuntu-latest
     needs: setup
-    if: github.event.inputs.build_binary == 'true'
     
     steps:
       - name: Checkout repository
@@ -76,6 +76,7 @@ jobs:
 
       - name: Install OpenTelemetry Collector Builder
         run: |
+          # Download OCB (OpenTelemetry Collector Builder) from official releases
           curl --proto '=https' --tlsv1.2 -fL -o ocb \
             "https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/cmd%2Fbuilder%2Fv${{ env.OCB_VERSION }}/ocb_${{ env.OCB_VERSION }}_linux_amd64"
           chmod +x ocb
@@ -84,15 +85,18 @@ jobs:
 
       - name: Build OpenTelemetry Collector
         run: |
+          # Set environment variables for OCB
           export VERSION=${{ needs.setup.outputs.version }}
           export GOOS=linux
           export GOARCH=amd64
+          # Build collector using configuration from builder-config.yaml
           ./ocb --config builder-config.yaml
       
       - name: Create binary archive
         run: |
           cd dist
           chmod +x otelcol-dynatrace
+          # Create compressed archive for distribution
           tar -czf ${{ needs.setup.outputs.binary-filename }} otelcol-dynatrace
 
       - name: Upload binary artifact
@@ -100,15 +104,14 @@ jobs:
         with:
           name: ${{ needs.setup.outputs.binary-artifact-name }}
           path: dist/${{ needs.setup.outputs.binary-filename }}
-          retention-days: 3
+          retention-days: 1  # Short retention as cleanup job will remove artifacts
 
+  # Deploy binary artifact to JFrog Artifactory - optional job
   deploy-to-jfrog:
     name: Deploy Binary to JFrog Artifactory
     runs-on: ubuntu-latest
     needs: [setup, build-binary]
-    if: |
-      github.event.inputs.deploy_to_jfrog == 'true' && 
-      needs.build-binary.result == 'success'
+    if: github.event.inputs.deploy_to_jfrog == 'true'
     
     steps:
       - name: Download binary artifact
@@ -121,6 +124,7 @@ jobs:
         with:
           version: 2.81.0
         env:
+          # JFrog connection configuration from repository secrets
           JF_URL: ${{ secrets.JFROG_URL }}
           JF_USER: ${{ secrets.JFROG_USERNAME }}
           JF_PASSWORD: ${{ secrets.JFROG_PASSWORD }}
@@ -130,27 +134,37 @@ jobs:
           VERSION=${{ needs.setup.outputs.version }}
           FILENAME=${{ needs.setup.outputs.binary-filename }}
           
+          # Upload binary with build metadata
           jf rt upload "$FILENAME" \
             "${{ secrets.JFROG_REPOSITORY }}/otelcol-dynatrace/$VERSION/linux-amd64/" \
             --build-name="otelcol-dynatrace" \
             --build-number="$VERSION" \
             --module="otelcol-dynatrace-linux-amd64"
           
+          # Publish build information to JFrog
           jf rt build-publish "otelcol-dynatrace" "$VERSION"
 
+  # Build Docker image and push to ECR - optional job, reuses binary artifact
   build-and-push-docker:
     name: Build and Push Docker Image to ECR
     runs-on: ubuntu-latest
-    needs: setup
+    needs: [setup, build-binary]
     if: github.event.inputs.build_and_push_docker == 'true'
     
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Download binary artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.setup.outputs.binary-artifact-name }}
+          path: ./prebuilt-binary  # docker-build.sh expects artifacts here
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
+          # AWS credentials from repository secrets
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_DEFAULT_REGION }}
@@ -161,6 +175,7 @@ jobs:
 
       - name: Build Docker image
         run: |
+          # Use docker-build.sh script which detects and uses prebuilt binary
           ./scripts/docker-build.sh \
             "${{ needs.setup.outputs.version }}" \
             "v${{ env.OCB_VERSION }}" \
@@ -170,3 +185,17 @@ jobs:
       - name: Push Docker image to ECR
         run: |
           docker push ${{ env.REGISTRY }}:${{ needs.setup.outputs.docker-tag }}
+
+  # Cleanup artifacts after workflow completion to save storage
+  cleanup:
+    name: Cleanup Artifacts
+    runs-on: ubuntu-latest
+    needs: [setup, build-binary, deploy-to-jfrog, build-and-push-docker]
+    if: always()  # Run even if other jobs fail
+    
+    steps:
+      - name: Delete binary artifact
+        uses: geekyeggo/delete-artifact@v2
+        with:
+          name: ${{ needs.setup.outputs.binary-artifact-name }}
+          failOnError: false  # Don't fail workflow if artifact doesn't exist

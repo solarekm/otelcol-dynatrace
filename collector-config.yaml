@@ -1,65 +1,75 @@
-# OpenTelemetry Collector Configuration - Minimal Setup
+# OpenTelemetry Collector Runtime Configuration
+# Defines how the collector processes and routes telemetry data
 
 receivers:
-  # OTLP Receiver
+  # OTLP Receiver - accepts data from other collectors or applications
   otlp:
     protocols:
       grpc:
-        endpoint: 0.0.0.0:4317
+        endpoint: 0.0.0.0:4317  # Standard OTLP gRPC port
       http:
-        endpoint: 0.0.0.0:4318
+        endpoint: 0.0.0.0:4318  # Standard OTLP HTTP port
 
-  # Dynatrace Receiver
+  # Dynatrace Receiver - collects metrics from Dynatrace API
+  # IMPORTANT: Update with your actual Dynatrace tenant and API token
   dynatracereceiver:
     endpoint: "https://your-dynatrace-tenant.live.dynatrace.com"
     api_token: "your-api-token"
-    collect_interval: 60s
+    collect_interval: 60s  # How often to poll Dynatrace API
     metrics:
+      # Define which metrics to collect and their dimensions
       - name: "host.cpu.usage"
         dimensions: ["host.name"]
-      - name: "host.memory.usage"  
+      - name: "host.memory.usage"
         dimensions: ["host.name"]
 
 processors:
-  # Filter processor
+  # Filter processor - include/exclude specific metrics
   filter:
     metrics:
       include:
         match_type: strict
+        # Empty list means no filtering - add metric names to filter
         metric_names: []
 
-  # Transform processor
+  # Transform processor - modify metric names and add prefixes
   transform:
     metric_statements:
       - context: metric
         statements:
+          # Add "transformed." prefix to all metric names
           - set(name, "transformed." + name) where name != nil
 
 connectors:
-  # Routing connector
+  # Routing connector - conditionally route data to different pipelines
   routing:
-    default_pipelines: [metrics/default]
+    default_pipelines: [metrics/default]  # Default destination for unmatched data
     table:
+      # Route all metrics matching any pattern to default pipeline
       - statement: route() where IsMatch(name, ".*")
         pipelines: [metrics/default]
 
 exporters:
-  # Debug exporter
+  # Debug exporter - prints received data to console (useful for development)
   debug:
-    verbosity: basic
+    verbosity: basic  # Options: basic, normal, detailed
 
-  # OTLP HTTP exporter
+  # OTLP HTTP exporter - forward data to another collector or backend
   otlphttp:
+    # Change to your actual backend endpoint
     endpoint: http://localhost:4318
 
 service:
+  # Define data processing pipelines - how data flows through the collector
   pipelines:
-    # Default metrics pipeline
+    # Default metrics pipeline - processes all incoming metrics
     metrics/default:
-      receivers: [otlp, dynatracereceiver]
-      processors: [filter, transform]
-      exporters: [debug, otlphttp]
+      receivers: [otlp, dynatracereceiver]  # Data sources
+      processors: [filter, transform]       # Data transformations (order matters)
+      exporters: [debug, otlphttp]         # Data destinations
 
+  # Collector telemetry configuration
   telemetry:
     logs:
+      # Options: debug, info, warn, error
       level: "info"

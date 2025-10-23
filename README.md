@@ -24,22 +24,25 @@ receivers:
 
 ### Using Binary
 ```bash
-./otelcol-dynatrace_dev-{hash}-{timestamp}_linux_amd64 --config=collector-config.yaml
+# Download from GitHub Actions artifacts or build using workflow
+./otelcol-dynatrace --config=collector-config.yaml
 ```
 
 ### Using Docker
 ```bash
 docker run -d \
   -p 8888:8888 -p 13133:13133 -p 4317:4317 -p 4318:4318 \
-  {ecr-registry}/otelcol-dynatrace_dev-{hash}-{timestamp}_linux_amd64
+  -v $(pwd)/collector-config.yaml:/etc/otelcol/config.yaml \
+  {ecr-registry}:otelcol-dynatrace_{version}_linux_amd64
 ```
 
 ## Manual Workflow
 
 Go to **Actions** → **Build and Deploy OpenTelemetry Collector** → **Run workflow**
 
+**Binary artifact is always built** to ensure artifact availability for downstream jobs.
+
 Available options:
-- **Build binary artifact** - Creates Linux AMD64 binary archive
 - **Deploy to JFrog Artifactory** - Uploads binary archive (requires JFrog secrets)
 - **Build Docker image to ECR** - Creates and pushes Docker image to AWS ECR (requires AWS secrets)
 
@@ -67,8 +70,16 @@ AWS_ECR_REGISTRY=123456789012.dkr.ecr.eu-central-1.amazonaws.com
 
 Follows OpenTelemetry naming convention:
 - **Binary archive**: `otelcol-dynatrace_{version}_{os}_{arch}.tar.gz`
-- **Docker image**: `otelcol-dynatrace_{version}_{os}_{arch}`
+- **Docker image tag**: `otelcol-dynatrace_{version}_{os}_{arch}`
 
 Examples:
-- **Binary archive**: `otelcol-dynatrace_dev-e85090ec-20251016172801_linux_amd64`
-- **Docker image**: `otelcol-dynatrace_dev-e85090ec-20251016172801_linux_amd64.tar.gz`
+- **Binary archive**: `otelcol-dynatrace_dev-e85090ec-20251016172801_linux_amd64.tar.gz`
+- **Docker image tag**: `otelcol-dynatrace_dev-e85090ec-20251016172801_linux_amd64`
+
+## Build Optimization
+
+The workflow is optimized to avoid duplicate OpenTelemetry builds:
+- Binary artifact is **always built** to ensure consistency
+- Docker build **reuses the binary artifact** when both options are selected
+- **Cleanup job** automatically removes artifacts after workflow completion
+- This reduces build time and ensures consistency between binary and Docker outputs
