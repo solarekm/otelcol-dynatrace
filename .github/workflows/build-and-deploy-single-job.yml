@@ -75,6 +75,7 @@ jobs:
           chmod +x otelcol-dynatrace
           tar -czf "${{ steps.version.outputs.binary-filename }}" otelcol-dynatrace
           ls -la "${{ steps.version.outputs.binary-filename }}"
+          echo "Created archive in: $(pwd)/${{ steps.version.outputs.binary-filename }}"
 
       - name: Setup JFrog CLI
         if: github.event.inputs.deploy_to_jfrog == 'true'
@@ -147,6 +148,13 @@ jobs:
             echo "Docker build: requested"
           fi
 
+      - name: Debug file location
+        if: always()
+        run: |
+          echo "Looking for file: ${{ steps.version.outputs.binary-filename }}"
+          find . -name "*${{ steps.version.outputs.binary-filename }}*" -type f || true
+          ls -la dist/ || true
+          
       - name: Upload binary artifact
         uses: actions/upload-artifact@v4
         with:
