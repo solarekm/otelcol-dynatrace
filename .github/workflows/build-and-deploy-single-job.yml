@@ -5,6 +5,14 @@ name: Build and Deploy OT Collector Contrib - Single Job
 on:
   workflow_dispatch:
     inputs:
+      environment:
+        description: 'Target environment for deployment'
+        required: true
+        type: choice
+        options:
+          - DEV
+          - TST
+        default: DEV
       deploy_to_jfrog:
         description: 'Deploy binary to JFrog Artifactory'
         required: false
@@ -23,13 +31,13 @@ permissions:
 env:
   GOLANG_VERSION: '1.24'
   OCB_VERSION: '0.137.0'
-  REGISTRY: ${{ secrets.AWS_ECR_REGISTRY }}
 
 jobs:
   # Single job combining setup, build, and deployment operations
   build-and-deploy-all:
-    name: Build and Deploy Binary and Docker Image
+    name: Build and Deploy Binary and Docker Image (${{ github.event.inputs.environment }})
     runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
     
     steps:
       - name: Checkout repository
@@ -50,10 +58,15 @@ jobs:
           else
             VERSION="dev-$(echo $GITHUB_SHA | cut -c1-8)-${TIMESTAMP}"
           fi
+          ENV=${{ github.event.inputs.environment }}
+          OS="linux"
+          ARCH="amd64"
+          
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "binary-filename=otelcol-dynatrace_${VERSION}_linux_amd64.tar.gz" >> $GITHUB_OUTPUT
-          echo "binary-artifact-name=otelcol-dynatrace_${VERSION}_linux_amd64" >> $GITHUB_OUTPUT
-          echo "docker-tag=otelcol-dynatrace_${VERSION}_linux_amd64" >> $GITHUB_OUTPUT
+          echo "environment=$ENV" >> $GITHUB_OUTPUT
+          echo "binary-filename=otelcol-dynatrace_${ENV}_${VERSION}_${OS}_${ARCH}.tar.gz" >> $GITHUB_OUTPUT
+          echo "binary-artifact-name=otelcol-dynatrace_${ENV}_${VERSION}_${OS}_${ARCH}" >> $GITHUB_OUTPUT
+          echo "docker-tag=otelcol-dynatrace_${ENV}_${VERSION}_${OS}_${ARCH}" >> $GITHUB_OUTPUT
 
       - name: Install OpenTelemetry Collector Builder
         run: |
@@ -92,11 +105,11 @@ jobs:
         run: |
           cd dist
           jf rt upload "${{ steps.version.outputs.binary-filename }}" \
-            "${{ secrets.JFROG_REPOSITORY }}/otelcol-dynatrace/${{ steps.version.outputs.version }}/linux-amd64/" \
-            --build-name="otelcol-dynatrace" \
+            "${{ secrets.JFROG_REPOSITORY }}/otelcol-dynatrace/${{ steps.version.outputs.environment }}/${{ steps.version.outputs.version }}/linux-amd64/" \
+            --build-name="otelcol-dynatrace-${{ steps.version.outputs.environment }}" \
             --build-number="${{ steps.version.outputs.version }}" \
-            --module="otelcol-dynatrace-linux-amd64"
-          jf rt build-publish "otelcol-dynatrace" "${{ steps.version.outputs.version }}"
+            --module="otelcol-dynatrace-${{ steps.version.outputs.environment }}-linux-amd64"
+          jf rt build-publish "otelcol-dynatrace-${{ steps.version.outputs.environment }}" "${{ steps.version.outputs.version }}"
 
       - name: Configure AWS credentials
         if: github.event.inputs.build_and_push_docker == 'true'
@@ -124,28 +137,29 @@ jobs:
           ./scripts/docker-build.sh \
             "${{ steps.version.outputs.version }}" \
             "v${{ env.OCB_VERSION }}" \
-            "${{ env.REGISTRY }}" \
+            "${{ secrets.AWS_ECR_REGISTRY }}" \
             "${{ steps.version.outputs.docker-tag }}"
 
       - name: Push Docker image to ECR
         if: github.event.inputs.build_and_push_docker == 'true'
         run: |
-          docker push "${{ env.REGISTRY }}:${{ steps.version.outputs.docker-tag }}"
+          docker push "${{ secrets.AWS_ECR_REGISTRY }}:${{ steps.version.outputs.docker-tag }}"
 
       - name: Build summary
         if: always()
         run: |
+          echo "Environment: ${{ steps.version.outputs.environment }}"
           echo "Version: ${{ steps.version.outputs.version }}"
           echo "Binary: ${{ steps.version.outputs.binary-filename }}"
           echo "Docker Tag: ${{ steps.version.outputs.docker-tag }}"
-          if [ -f "dist/${{ steps.version.outputs.binary-filename }}" ]; then
-            echo "Binary archive: dist/${{ steps.version.outputs.binary-filename }} ($(du -h "dist/${{ steps.version.outputs.binary-filename }}" | cut -f1))"
+          if [ -f "prebuilt-binary/${{ steps.version.outputs.binary-filename }}" ]; then
+            echo "Binary archive: prebuilt-binary/${{ steps.version.outputs.binary-filename }} ($(du -h "prebuilt-binary/${{ steps.version.outputs.binary-filename }}" | cut -f1))"
           fi
           if [ "${{ github.event.inputs.deploy_to_jfrog }}" == "true" ]; then
-            echo "JFrog deployment: requested"
+            echo "JFrog deployment: requested for ${{ steps.version.outputs.environment }}"
           fi
           if [ "${{ github.event.inputs.build_and_push_docker }}" == "true" ]; then
-            echo "Docker build: requested"
+            echo "Docker build: requested for ${{ steps.version.outputs.environment }}"
           fi
 
       - name: Upload binary artifact
