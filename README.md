@@ -42,31 +42,40 @@ docker run -d \
 
 Go to **Actions** → **Build and Deploy OpenTelemetry Collector** → **Run workflow**
 
+**Environment Selection**: Choose DEV or TST environment from dropdown
+
 **Binary artifact is always built** to ensure artifact availability for downstream jobs.
 
 Available options:
-- **Deploy to JFrog Artifactory** - Uploads binary archive (requires JFrog secrets)
-- **Build Docker image to ECR** - Creates and pushes Docker image to AWS ECR (requires AWS secrets)
+- **Deploy to JFrog Artifactory** - Uploads binary archive (uses repository secrets)
+- **Build Docker image to ECR** - Creates and pushes Docker image to AWS ECR (uses environment secrets)
 
 ### Single Job Workflow (Alternative)
 
 Go to **Actions** → **Build and Deploy OT Collector - Single Job** → **Run workflow**
 
+**Environment Selection**: Choose DEV or TST environment from dropdown
+
 **All operations in one job** for simplified execution and shared filesystem.
 
 Available options:
-- **Deploy to JFrog Artifactory** - Uploads binary archive (requires JFrog secrets)  
-- **Build Docker image to ECR** - Creates and pushes Docker image to AWS ECR (requires AWS secrets)
+- **Deploy to JFrog Artifactory** - Separate job using repository secrets
+- **Build Docker image to ECR** - Main job using environment secrets
 
 **Differences:**
 - ✅ **Single Job**: Shared filesystem, no artifacts needed, simpler dependencies
 - ✅ **Multi Job**: Parallel execution, better error isolation, reusable artifacts
 
-## GitHub Secrets
+## GitHub Environments & Secrets
 
-Configure in repository Settings > Secrets and variables > Actions:
+The repository uses **GitHub Environments** for environment segregation:
+- **DEV** - Development environment 
+- **TST** - Test environment
 
-### JFrog Artifactory (optional)
+### Repository Secrets (Shared)
+
+Configure JFrog secrets at repository level (Settings > Secrets and variables > Actions):
+
 ```
 JFROG_URL=https://your-company.jfrog.io
 JFROG_USERNAME=your-username
@@ -74,23 +83,61 @@ JFROG_PASSWORD=your-password
 JFROG_REPOSITORY=your-repository
 ```
 
-### AWS ECR (optional)
+### Environment Secrets (DEV/TST Specific)
+
+Configure AWS secrets per environment (Settings > Environments > [DEV/TST] > Secrets):
+
+**DEV Environment:**
 ```
 AWS_ACCESS_KEY_ID=AKIAXXXXXXXXXXXXXXXX
-AWS_SECRET_ACCESS_KEY=your-secret-key
+AWS_SECRET_ACCESS_KEY=your-dev-secret-key
 AWS_DEFAULT_REGION=eu-central-1
 AWS_ECR_REGISTRY=123456789012.dkr.ecr.eu-central-1.amazonaws.com
 ```
 
+**TST Environment:**
+```
+AWS_ACCESS_KEY_ID=AKIAXXXXXXXXXXXXXXXX
+AWS_SECRET_ACCESS_KEY=your-tst-secret-key
+AWS_DEFAULT_REGION=eu-central-1
+AWS_ECR_REGISTRY=123456789012.dkr.ecr.eu-central-1.amazonaws.com
+```
+
+## Workflow Usage
+
+Both workflows support **environment selection** via dropdown:
+- Select **DEV** or **TST** environment when running manually
+- JFrog deployment uses repository secrets (shared)
+- AWS deployment uses environment-specific secrets
+
+## Environment Architecture
+
+### JFrog Artifactory (Shared Repository)
+- Uses **repository-level secrets** (accessible to all jobs)
+- Deploys to environment-specific paths: `/otelcol-dynatrace/{ENV}/{VERSION}/`
+- Single JFrog repository serves both DEV and TST environments
+
+### AWS ECR (Environment Segregation)
+- Uses **environment-level secrets** (DEV/TST specific)
+- Requires environment selection for credential access
+- Separate ECR registries for DEV and TST
+
+### Secrets Configuration Summary
+- **Repository Secrets**: JFROG_* (shared across environments)
+- **Environment Secrets**: AWS_* (DEV/TST specific)
+- **Naming Convention**: Consistent hyphen-separated format
+
 ## Artifact Naming
 
-Follows OpenTelemetry naming convention:
-- **Binary archive**: `otelcol-dynatrace_{version}_{os}_{arch}.tar.gz`
-- **Docker image tag**: `otelcol-dynatrace_{version}_{os}_{arch}`
+Consistent hyphen-separated naming convention:
+- **Binary archive**: `otelcol-dynatrace-{env}-{version}-{os}-{arch}.tar.gz`
+- **Docker image tag**: `otelcol-dynatrace-{env}-{version}-{os}-{arch}`
 
 Examples:
-- **Binary archive**: `otelcol-dynatrace_dev-e85090ec-20251016172801_linux_amd64.tar.gz`
-- **Docker image tag**: `otelcol-dynatrace_dev-e85090ec-20251016172801_linux_amd64`
+- **Development**: `otelcol-dynatrace-dev-abc12345-20241230123456-linux-amd64.tar.gz`
+- **Tagged release**: `otelcol-dynatrace-tst-v1.2.3-linux-amd64.tar.gz`
+
+JFrog artifact paths: `/otelcol-dynatrace/{ENV}/{VERSION}/linux-amd64/`
 
 ## Build Optimization
 

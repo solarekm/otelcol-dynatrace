@@ -33,11 +33,52 @@ env:
   OCB_VERSION: '0.137.0'
 
 jobs:
-  # Single job combining setup, build, and deployment operations
+  # JFrog deployment - uses repository secrets (shared across environments)
+  jfrog-deploy:
+    name: Deploy to JFrog Artifactory
+    runs-on: ubuntu-latest
+    if: github.event.inputs.deploy_to_jfrog == 'true'
+    needs: build-and-deploy-all
+    
+    steps:
+      - name: Download binary artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build-and-deploy-all.outputs.binary-artifact-name }}
+
+      - name: Setup JFrog CLI
+        uses: jfrog/setup-jfrog-cli@v4
+        with:
+          version: 2.81.0
+        env:
+          JF_URL: ${{ secrets.JFROG_URL }}
+          JF_USER: ${{ secrets.JFROG_USERNAME }}
+          JF_PASSWORD: ${{ secrets.JFROG_PASSWORD }}
+
+      - name: Upload to JFrog Artifactory
+        run: |
+          ENVIRONMENT=${{ github.event.inputs.environment }}
+          VERSION=${{ needs.build-and-deploy-all.outputs.version }}
+          FILENAME=${{ needs.build-and-deploy-all.outputs.binary-filename }}
+          
+          jf rt upload "$FILENAME" \
+            "${{ secrets.JFROG_REPOSITORY }}/otelcol-dynatrace/$ENVIRONMENT/$VERSION/linux-amd64/" \
+            --build-name="otelcol-dynatrace-$ENVIRONMENT" \
+            --build-number="$VERSION" \
+            --module="otelcol-dynatrace-$ENVIRONMENT-linux-amd64"
+          jf rt build-publish "otelcol-dynatrace-$ENVIRONMENT" "$VERSION"
+
+  # Main build and AWS deployment - uses environment secrets (DEV/TST specific)
   build-and-deploy-all:
     name: Build and Deploy Binary and Docker Image (${{ github.event.inputs.environment }})
     runs-on: ubuntu-latest
     environment: ${{ github.event.inputs.environment }}
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      environment: ${{ steps.version.outputs.environment }}
+      binary-filename: ${{ steps.version.outputs.binary-filename }}
+      binary-artifact-name: ${{ steps.version.outputs.binary-artifact-name }}
+      docker-tag: ${{ steps.version.outputs.docker-tag }}
     
     steps:
       - name: Checkout repository
@@ -94,26 +135,13 @@ jobs:
           ls -la "${{ steps.version.outputs.binary-filename }}"
           echo "Created archive in: $(pwd)/${{ steps.version.outputs.binary-filename }}"
 
-      - name: Setup JFrog CLI
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
         if: github.event.inputs.deploy_to_jfrog == 'true'
-        uses: jfrog/setup-jfrog-cli@v4
         with:
-          version: 2.81.0
-        env:
-          JF_URL: ${{ secrets.JFROG_URL }}
-          JF_USER: ${{ secrets.JFROG_USERNAME }}
-          JF_PASSWORD: ${{ secrets.JFROG_PASSWORD }}
-
-      - name: Upload to JFrog Artifactory
-        if: github.event.inputs.deploy_to_jfrog == 'true'
-        run: |
-          cd dist
-          jf rt upload "${{ steps.version.outputs.binary-filename }}" \
-            "${{ secrets.JFROG_REPOSITORY }}/otelcol-dynatrace/${{ steps.version.outputs.environment }}/${{ steps.version.outputs.version }}/linux-amd64/" \
-            --build-name="otelcol-dynatrace-${{ steps.version.outputs.environment }}" \
-            --build-number="${{ steps.version.outputs.version }}" \
-            --module="otelcol-dynatrace-${{ steps.version.outputs.environment }}-linux-amd64"
-          jf rt build-publish "otelcol-dynatrace-${{ steps.version.outputs.environment }}" "${{ steps.version.outputs.version }}"
+          name: ${{ steps.version.outputs.binary-artifact-name }}
+          path: dist/${{ steps.version.outputs.binary-filename }}
+          retention-days: 1
 
       - name: Configure AWS credentials
         if: github.event.inputs.build_and_push_docker == 'true'
