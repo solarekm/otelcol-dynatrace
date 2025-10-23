@@ -54,19 +54,23 @@ jobs:
         run: |
           TIMESTAMP=$(date +'%Y%m%d%H%M%S')
           if [[ $GITHUB_REF == refs/tags/v* ]]; then
-            VERSION=${GITHUB_REF#refs/tags/v}
+            # For tags, use clean version without env prefix
+            VERSION_CLEAN=${GITHUB_REF#refs/tags/v}
+            VERSION_FULL="v${VERSION_CLEAN}"
           else
-            VERSION="dev-$(echo $GITHUB_SHA | cut -c1-8)-${TIMESTAMP}"
+            # For development builds, create clean version identifier
+            VERSION_CLEAN="$(echo $GITHUB_SHA | cut -c1-8)-${TIMESTAMP}"
+            VERSION_FULL="dev-${VERSION_CLEAN}"
           fi
           ENV=${{ github.event.inputs.environment }}
           OS="linux"
           ARCH="amd64"
           
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "version=$VERSION_FULL" >> $GITHUB_OUTPUT
           echo "environment=$ENV" >> $GITHUB_OUTPUT
-          echo "binary-filename=otelcol-dynatrace_${ENV}_${VERSION}_${OS}_${ARCH}.tar.gz" >> $GITHUB_OUTPUT
-          echo "binary-artifact-name=otelcol-dynatrace_${ENV}_${VERSION}_${OS}_${ARCH}" >> $GITHUB_OUTPUT
-          echo "docker-tag=otelcol-dynatrace_${ENV}_${VERSION}_${OS}_${ARCH}" >> $GITHUB_OUTPUT
+          echo "binary-filename=otelcol-dynatrace_${ENV}_${VERSION_CLEAN}_${OS}_${ARCH}.tar.gz" >> $GITHUB_OUTPUT
+          echo "binary-artifact-name=otelcol-dynatrace_${ENV}_${VERSION_CLEAN}_${OS}_${ARCH}" >> $GITHUB_OUTPUT
+          echo "docker-tag=otelcol-dynatrace_${ENV}_${VERSION_CLEAN}_${OS}_${ARCH}" >> $GITHUB_OUTPUT
 
       - name: Install OpenTelemetry Collector Builder
         run: |
