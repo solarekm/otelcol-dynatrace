@@ -2,7 +2,7 @@ name: Build and Deploy OT Collector Contrib
 
 # Manual workflow for building OpenTelemetry Collector Contrib with Dynatrace receiver
 # Always builds binary artifact, with optional deployments to JFrog and ECR
-run-name: Build and Deploy OT Collector [${{ github.event.inputs.environment || 'DEV' }}] - JFrog:${{ github.event.inputs.deploy_to_jfrog || 'false' }} Docker:${{ github.event.inputs.build_and_push_docker || 'false' }}
+run-name: Build and Deploy OT Collector [${{ github.event.inputs.environment }}] - JFrog:${{ github.event.inputs.deploy_to_jfrog }} Docker:${{ github.event.inputs.build_and_push_docker }}
 
 on:
   workflow_dispatch:

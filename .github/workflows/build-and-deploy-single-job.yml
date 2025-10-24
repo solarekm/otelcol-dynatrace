@@ -2,7 +2,7 @@ name: Build and Deploy OT Collector Contrib - Single Job
 
 # Manual workflow for building OpenTelemetry Collector with Dynatrace receiver
 # Single job approach - all operations in one job with shared filesystem
-run-name: Build and Deploy OT Collector - Single Job [${{ github.event.inputs.environment || 'DEV' }}] - JFrog:${{ github.event.inputs.deploy_to_jfrog || 'false' }} Docker:${{ github.event.inputs.build_and_push_docker || 'false' }}
+run-name: Build and Deploy OT Collector - Single Job [${{ github.event.inputs.environment }}] - JFrog:${{ github.event.inputs.deploy_to_jfrog }} Docker:${{ github.event.inputs.build_and_push_docker }}
 
 on:
   workflow_dispatch:
