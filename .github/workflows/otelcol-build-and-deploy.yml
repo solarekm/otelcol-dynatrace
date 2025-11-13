@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: 'Target environment for deployment'
+        description: 'Environment'
         required: true
         type: choice
         options:
@@ -33,6 +33,7 @@ permissions:
 env:
   GOLANG_VERSION: '1.24'
   OCB_VERSION: '0.137.0'
+  JFROG_VERSION: '2.81.0'
 
 jobs:
   # Generate version string and artifact names used across all jobs
@@ -41,7 +42,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
-      environment: ${{ steps.version.outputs.environment }}
       binary-filename: ${{ steps.version.outputs.binary-filename }}
       binary-artifact-name: ${{ steps.version.outputs.binary-artifact-name }}
       docker-tag: ${{ steps.version.outputs.docker-tag }}
@@ -50,28 +50,18 @@ jobs:
         id: version
         run: |
           TIMESTAMP=$(date +'%Y%m%d%H%M%S')
-          if [[ $GITHUB_REF == refs/tags/v* ]]; then
-            # For tags, use clean version without env prefix
-            VERSION_CLEAN=${GITHUB_REF#refs/tags/v}
-            VERSION_FULL="v${VERSION_CLEAN}"
-          else
-            # For development builds, create clean version identifier
-            VERSION_CLEAN="$(echo $GITHUB_SHA | cut -c1-8)-${TIMESTAMP}"
-            VERSION_FULL="dev-${VERSION_CLEAN}"
-          fi
-          ENV=${{ github.event.inputs.environment }}
-          OS="linux"
-          ARCH="amd64"
+
+          # For development builds, create clean version identifier
+          VERSION_CLEAN="$(echo $GITHUB_SHA | cut -c1-8)-${TIMESTAMP}"
           
-          echo "version=$VERSION_FULL" >> $GITHUB_OUTPUT
-          echo "environment=$ENV" >> $GITHUB_OUTPUT
-          echo "binary-filename=otelcol-dynatrace-${ENV}-${VERSION_CLEAN}-${OS}-${ARCH}.tar.gz" >> $GITHUB_OUTPUT
-          echo "binary-artifact-name=otelcol-dynatrace-${ENV}-${VERSION_CLEAN}-${OS}-${ARCH}" >> $GITHUB_OUTPUT
-          echo "docker-tag=otelcol-dynatrace-${ENV}-${VERSION_CLEAN}-${OS}-${ARCH}" >> $GITHUB_OUTPUT
+          echo "version=$VERSION_CLEAN" >> $GITHUB_OUTPUT
+          echo "binary-filename=otelcol-dynatrace-${{ github.event.inputs.environment }}-${{ env.OCB_VERSION }}-${VERSION_CLEAN}.tar.gz" >> $GITHUB_OUTPUT
+          echo "binary-artifact-name=otelcol-dynatrace-${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
+          echo "docker-tag=otelcol-dynatrace-${{ github.event.inputs.environment }}-${VERSION_CLEAN}" >> $GITHUB_OUTPUT
 
   # Build OpenTelemetry Collector binary - always runs to ensure artifact availability
   build-binary:
-    name: Build Binary Artifact (${{ needs.setup.outputs.environment }})
+    name: Build Binary Artifact (${{ github.event.inputs.environment }})
     runs-on: ubuntu-latest
     needs: setup
     
@@ -85,42 +75,39 @@ jobs:
           go-version: ${{ env.GOLANG_VERSION }}
           cache: false
 
+      # Download OCB (OpenTelemetry Collector Builder) from official releases and verify OCB was downloaded successfully
       - name: Install OpenTelemetry Collector Builder
         run: |
-          # Download OCB (OpenTelemetry Collector Builder) from official releases
           curl --proto '=https' --tlsv1.2 -fL -o ocb \
             "https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/cmd%2Fbuilder%2Fv${{ env.OCB_VERSION }}/ocb_${{ env.OCB_VERSION }}_linux_amd64"
           chmod +x ocb
-          # Verify OCB was downloaded successfully
           ./ocb version
 
+      # Build collector using configuration from builder-config.yaml
       - name: Build OpenTelemetry Collector Contrib
+        env:
+          VERSION: ${{ env.OCB_VERSION }}-${{ needs.setup.outputs.version }}
         run: |
-          # Set environment variables for OCB
-          export VERSION=${{ needs.setup.outputs.version }}
-          export GOOS=linux
-          export GOARCH=amd64
-          # Build collector using configuration from builder-config.yaml
           ./ocb --config builder-config.yaml
       
+      # Create compressed archive for distribution
       - name: Create binary archive
         run: |
           cd dist
           chmod +x otelcol-dynatrace
-          # Create compressed archive for distribution
           tar -czf ${{ needs.setup.outputs.binary-filename }} otelcol-dynatrace
 
       - name: Upload binary artifact
         uses: actions/upload-artifact@v5
         with:
-          name: ${{ needs.setup.outputs.binary-artifact-name }}
+          name: ${{ needs.setup.outputs.binary-artifact-name }}-${{ needs.setup.outputs.version }}
           path: dist/${{ needs.setup.outputs.binary-filename }}
           retention-days: 1  # Artifacts automatically removed after 1 day
 
   # Deploy binary artifact to JFrog Artifactory - optional job
   # Uses repository secrets (shared across environments)
   deploy-to-jfrog:
-    name: Deploy Binary to JFrog Artifactory (${{ needs.setup.outputs.environment }})
+    name: Deploy Binary to JFrog Artifactory (${{ github.event.inputs.environment }})
     runs-on: ubuntu-latest
     needs: [setup, build-binary]
     if: github.event.inputs.deploy_to_jfrog == 'true'
@@ -129,37 +116,37 @@ jobs:
       - name: Download binary artifact
         uses: actions/download-artifact@v6
         with:
-          name: ${{ needs.setup.outputs.binary-artifact-name }}
+          name: ${{ needs.setup.outputs.binary-artifact-name }}-${{ needs.setup.outputs.version }}
 
       - name: Setup JFrog CLI
         uses: jfrog/setup-jfrog-cli@v4
         with:
-          version: 2.81.0
-        env:
-          # JFrog connection configuration from repository secrets
-          JF_URL: ${{ secrets.JFROG_URL }}
-          JF_USER: ${{ secrets.JFROG_USERNAME }}
-          JF_PASSWORD: ${{ secrets.JFROG_PASSWORD }}
-
-      - name: Upload to JFrog Artifactory
+          version: ${{ env.JFROG_VERSION }}
+      
+      # JFrog connection configuration from repository secrets
+      - name: Configure JFrog CLI
         run: |
-          VERSION=${{ needs.setup.outputs.version }}
-          ENVIRONMENT=${{ needs.setup.outputs.environment }}
-          FILENAME=${{ needs.setup.outputs.binary-filename }}
-          
-          # Upload binary with build metadata
-          jf rt upload "$FILENAME" \
-            "${{ secrets.JFROG_REPOSITORY }}/otelcol-dynatrace/$ENVIRONMENT/$VERSION/linux-amd64/" \
-            --build-name="otelcol-dynatrace-$ENVIRONMENT" \
-            --build-number="$VERSION" \
-            --module="otelcol-dynatrace-$ENVIRONMENT-linux-amd64"
+          jf config add artifactory-server \
+            --url ${{ secrets.JFROG_URL }} \
+            --user ${{ secrets.JFROG_USER }} \
+            --access-token ${{ secrets.JFROG_TOKEN }} \
+            --interactive=false
+
+      # Upload binary with build metadata
+      - name: Upload to JFrog Artifactory
+        run: |          
+          jf rt upload "${{ needs.setup.outputs.binary-filename }}" \
+            "${{ secrets.JFROG_URL }}/otelcol-dynatrace/${{ github.event.inputs.environment }}/${{ needs.setup.outputs.version }}/" \
+            --build-name="${{ needs.setup.outputs.binary-artifact-name }}" \
+            --build-number="${{ needs.setup.outputs.version }}" \
+            --module="otelcol-dynatrace-${{ github.event.inputs.environment }}-linux-amd64"
           
           # Publish build information to JFrog
-          jf rt build-publish "otelcol-dynatrace-$ENVIRONMENT" "$VERSION"
+          jf rt build-publish "${{ needs.setup.outputs.binary-artifact-name }}" "${{ needs.setup.outputs.version }}"
 
   # Build Docker image and push to ECR - optional job, reuses binary artifact
   build-and-push-docker:
-    name: Build and Push Docker Image to ECR (${{ needs.setup.outputs.environment }})
+    name: Build and Push Docker Image to ECR (${{ github.event.inputs.environment }})
     runs-on: ubuntu-latest
     environment: ${{ github.event.inputs.environment }}
     needs: [setup, build-binary]
@@ -172,7 +159,7 @@ jobs:
       - name: Download binary artifact
         uses: actions/download-artifact@v6
         with:
-          name: ${{ needs.setup.outputs.binary-artifact-name }}
+          name: ${{ needs.setup.outputs.binary-artifact-name }}-${{ needs.setup.outputs.version }}
           path: ./prebuilt-binary  # docker-build.sh expects artifacts here
 
       - name: Configure AWS credentials
@@ -199,5 +186,3 @@ jobs:
       - name: Push Docker image to ECR
         run: |
           docker push ${{ secrets.AWS_ECR_REGISTRY }}:${{ needs.setup.outputs.docker-tag }}
-
-
