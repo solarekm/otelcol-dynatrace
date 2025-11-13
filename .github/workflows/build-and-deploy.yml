@@ -77,10 +77,10 @@ jobs:
     
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Go environment
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GOLANG_VERSION }}
           cache: false
@@ -111,7 +111,7 @@ jobs:
           tar -czf ${{ needs.setup.outputs.binary-filename }} otelcol-dynatrace
 
       - name: Upload binary artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ${{ needs.setup.outputs.binary-artifact-name }}
           path: dist/${{ needs.setup.outputs.binary-filename }}
@@ -127,7 +127,7 @@ jobs:
     
     steps:
       - name: Download binary artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: ${{ needs.setup.outputs.binary-artifact-name }}
 
@@ -167,16 +167,16 @@ jobs:
     
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Download binary artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: ${{ needs.setup.outputs.binary-artifact-name }}
           path: ./prebuilt-binary  # docker-build.sh expects artifacts here
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v5
         with:
           # AWS credentials from environment secrets (DEV/TST specific)
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
