@@ -1,5 +1,5 @@
 name: Build Custom OT Collector
-run-name: Build Custom OT Collector | env:[${{ github.event.inputs.environment }}]
+run-name: Build Custom OT Collector for ${{ github.event.inputs.environment }} environment
 
 on:
   workflow_dispatch:
@@ -25,11 +25,11 @@ env:
   OCB_VERSION: '0.141.0'
   VERSION: ${{ github.run_number }}
   BINARY_FILENAME: 'otelcol-custom-linux-amd64.tar.gz'
-  BINARY_ARTIFACT_NAME: 'otelcol-custom-binary'
+  BINARY_ARTIFACT_NAME: 'otelcol-custom'
 
 jobs:
   build-binary:
-    name: Building a Custom OT Collector
+    name: Build Custom OT Collector
     runs-on: ubuntu-latest
     environment: ${{ github.event.inputs.environment }}
     permissions:
@@ -43,17 +43,17 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GOLANG_VERSION }}
+          cache: false
 
-       # Download OCB (OpenTelemetry Collector Builder) from official releases and verify OCB was downloaded successfully
-      - name: Install OpenTelemetry Collector Builder
+       # Download OCB (OpenTelemetry Collector Builder) from official releases
+      - name: Install OCB
         run: |
           curl --proto '=https' --tlsv1.2 -fL -o ocb \
             "https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/cmd%2Fbuilder%2Fv${{ env.OCB_VERSION }}/ocb_${{ env.OCB_VERSION }}_linux_amd64"
           chmod +x ocb
           ./ocb version
 
-      # Build collector using configuration from builder-config-new.yaml
-      - name: Build OpenTelemetry Collector Contrib
+      - name: Build Custom OT Collector
         run: |
           ./ocb --config builder-config-new.yaml
 
