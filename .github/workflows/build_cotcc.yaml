@@ -22,7 +22,7 @@ concurrency:
 
 env:
   GOLANG_VERSION: '1.24'
-  OCB_VERSION: '0.138.0'
+  OCB_VERSION: '0.141.0'
   VERSION: ${{ github.run_number }}
   BINARY_FILENAME: 'otelcol-custom-linux-amd64.tar.gz'
   BINARY_ARTIFACT_NAME: 'otelcol-custom-binary'
