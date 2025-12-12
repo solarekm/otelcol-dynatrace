@@ -24,8 +24,6 @@ env:
   GOLANG_VERSION: '1.24'
   OCB_VERSION: '0.141.0'
   VERSION: ${{ github.run_number }}
-  BINARY_FILENAME: 'otelcol-custom-linux-amd64.tar.gz'
-  BINARY_ARTIFACT_NAME: 'otelcol-custom'
 
 jobs:
   build-binary:
@@ -80,17 +78,11 @@ jobs:
           
           echo "✅ Binary verified successfully"
 
-      # Create compressed archive for distribution
-      - name: Create binary archive
-        run: |
-          cd dist
-          tar -czf ${{ env.BINARY_FILENAME }} otelcol-custom
-
       - name: Upload binary artifact
         uses: actions/upload-artifact@v5
         with:
-          name: ${{ env.BINARY_ARTIFACT_NAME }}-${{ env.VERSION }}
-          path: dist/${{ env.BINARY_FILENAME }}
+          name: otelcol-custom-${{ env.VERSION }}
+          path: dist/otelcol-custom
           retention-days: 1  # Artifacts automatically removed after 1 day
 
   build-push-and-deploy-to-ecs:
@@ -109,7 +101,7 @@ jobs:
       - name: Download binary artifact
         uses: actions/download-artifact@v6
         with:
-          name: ${{ env.BINARY_ARTIFACT_NAME }}-${{ env.VERSION }}
+          name: otelcol-custom-${{ env.VERSION }}
           path: ./prebuilt-binary  # docker-build.sh expects artifacts here
       
       - name: Configure AWS credentials
